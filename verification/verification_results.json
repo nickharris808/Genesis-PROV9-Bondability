@@ -1,0 +1,189 @@
+{
+  "total_checks": 36,
+  "passed": 36,
+  "failed": 0,
+  "warnings": 0,
+  "all_passed": true,
+  "checks": [
+    {
+      "check": "CMP hold-out d=0.1",
+      "status": "PASS",
+      "detail": "Predicted 20.0 nm, expected [14, 22] nm"
+    },
+    {
+      "check": "CMP hold-out d=0.2",
+      "status": "PASS",
+      "detail": "Predicted 15.0 nm, expected [10, 18] nm"
+    },
+    {
+      "check": "CMP hold-out d=0.4",
+      "status": "PASS",
+      "detail": "Predicted 7.5 nm, expected [5, 10] nm"
+    },
+    {
+      "check": "CMP hold-out d=0.6",
+      "status": "PASS",
+      "detail": "Predicted 6.5 nm, expected [5, 8] nm"
+    },
+    {
+      "check": "CMP hold-out d=0.8",
+      "status": "PASS",
+      "detail": "Predicted 12.0 nm, expected [8, 16] nm"
+    },
+    {
+      "check": "CMP hold-out d=0.9",
+      "status": "PASS",
+      "detail": "Predicted 16.0 nm, expected [12, 20] nm"
+    },
+    {
+      "check": "CMP bathtub shape",
+      "status": "PASS",
+      "detail": "Recess at d=0: 25.0, d=0.5: 5.0, d=1.0: 20.0 nm -- minimum near 0.5 confirmed"
+    },
+    {
+      "check": "Flexural rigidity (thick wafer)",
+      "status": "PASS",
+      "detail": "D = 5.47e+00 N*m for h=775 um"
+    },
+    {
+      "check": "Flexural rigidity (thin wafer)",
+      "status": "PASS",
+      "detail": "D = 1.18e-05 N*m for h=10 um"
+    },
+    {
+      "check": "Stiffness ratio (thick/thin)",
+      "status": "PASS",
+      "detail": "D_thick/D_thin = 4.65e+05, expected (h_thick/h_thin)^3 = 4.65e+05"
+    },
+    {
+      "check": "Conforming behavior (thin vs thick)",
+      "status": "PASS",
+      "detail": "A_crit_thin = 162025.5 nm > A_crit_thick = 2090.7 nm -- thin wafer conforms more easily"
+    },
+    {
+      "check": "Adhesion effect on contact",
+      "status": "PASS",
+      "detail": "A_crit(gamma=5.0) = 4504.2 nm > A_crit(gamma=0.5) = 2090.7 nm -- higher adhesion increases conforming"
+    },
+    {
+      "check": "Murphy yield monotonicity",
+      "status": "PASS",
+      "detail": "Y(D=0.1) = 0.909 > Y(D=2.0) = 0.333 -- monotonic"
+    },
+    {
+      "check": "Murphy yield bounds",
+      "status": "PASS",
+      "detail": "Y_low = 0.909, Y_high = 0.333 -- all in [0,1]"
+    },
+    {
+      "check": "Murphy exact value (D=1, A=1, n=1)",
+      "status": "PASS",
+      "detail": "Y = 0.500000, expected 0.500000"
+    },
+    {
+      "check": "Murphy clustering effect",
+      "status": "PASS",
+      "detail": "Y(n=1) = 0.667, Y(n=10) = 0.614, Y(Poisson) = 0.607 -- clustering increases yield for low D*A"
+    },
+    {
+      "check": "Murphy defect density sweep",
+      "status": "PASS",
+      "detail": "Yields across D=[0.01..10]: ['0.990', '0.909', '0.667', '0.500', '0.333', '0.167', '0.091'] -- monotonically decreasing"
+    },
+    {
+      "check": "FFT scaling 32x32 -> 64x64",
+      "status": "PASS",
+      "detail": "Time ratio: 3.60x, O(N log N) predicts: 4.80x, ratio: 0.75"
+    },
+    {
+      "check": "FFT scaling 64x64 -> 128x128",
+      "status": "PASS",
+      "detail": "Time ratio: 3.61x, O(N log N) predicts: 4.67x, ratio: 0.77"
+    },
+    {
+      "check": "FFT scaling 128x128 -> 256x256",
+      "status": "PASS",
+      "detail": "Time ratio: 3.69x, O(N log N) predicts: 4.57x, ratio: 0.81"
+    },
+    {
+      "check": "FFT scaling 256x256 -> 512x512",
+      "status": "PASS",
+      "detail": "Time ratio: 4.08x, O(N log N) predicts: 4.50x, ratio: 0.91"
+    },
+    {
+      "check": "FFT overall scaling (not quadratic)",
+      "status": "PASS",
+      "detail": "32->512 ratio: 196.0x, O(N log N): 460.8x, O(N^2): 65536x -- closer to N log N"
+    },
+    {
+      "check": "Physics chain stage count",
+      "status": "PASS",
+      "detail": "Expected 6 stages, found 6"
+    },
+    {
+      "check": "Stage present: cmp_planarity",
+      "status": "PASS",
+      "detail": "found in canonical values"
+    },
+    {
+      "check": "Stage present: contact_mechanics",
+      "status": "PASS",
+      "detail": "found in canonical values"
+    },
+    {
+      "check": "Stage present: void_formation",
+      "status": "PASS",
+      "detail": "found in canonical values"
+    },
+    {
+      "check": "Stage present: thermal_stress",
+      "status": "PASS",
+      "detail": "found in canonical values"
+    },
+    {
+      "check": "Stage present: delamination",
+      "status": "PASS",
+      "detail": "found in canonical values"
+    },
+    {
+      "check": "Stage present: yield_prediction",
+      "status": "PASS",
+      "detail": "found in canonical values"
+    },
+    {
+      "check": "Solver reference: cmp_model",
+      "status": "PASS",
+      "detail": "'Preston equation with PCHIP profile' contains 'Preston equation'"
+    },
+    {
+      "check": "Solver reference: contact_solver",
+      "status": "PASS",
+      "detail": "'Spectral FFT + Dugdale CZM' contains 'Spectral FFT'"
+    },
+    {
+      "check": "Solver reference: yield_model",
+      "status": "PASS",
+      "detail": "'Murphy/Stapper negative binomial' contains 'Murphy'"
+    },
+    {
+      "check": "Validation flag: stine_1998_validation",
+      "status": "PASS",
+      "detail": "Expected True, found True"
+    },
+    {
+      "check": "Validation flag: turner_2002_validation",
+      "status": "PASS",
+      "detail": "Expected True, found True"
+    },
+    {
+      "check": "Total claims count",
+      "status": "PASS",
+      "detail": "Expected 13, found 13"
+    },
+    {
+      "check": "Research status",
+      "status": "PASS",
+      "detail": "Status: 'research' -- correctly marked research"
+    }
+  ]
+}

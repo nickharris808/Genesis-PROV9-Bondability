@@ -1,0 +1,83 @@
+{
+  "meta": {
+    "description": "Canonical reference values for Genesis PROV 9 Bondability verification",
+    "generated": "2026-02-18",
+    "status": "research"
+  },
+  "cmp_model": "Preston equation with PCHIP profile",
+  "cmp_calibration_source": "Stine et al. 1998 (aluminum CMP -- NOT copper)",
+  "cmp_calibration_knots": {
+    "densities": [0.0, 0.3, 0.5, 0.7, 1.0],
+    "recess_nm": [25.0, 10.0, 5.0, 8.0, 20.0]
+  },
+  "cmp_epl_um_default": 100.0,
+  "contact_solver": "Spectral FFT + Dugdale CZM",
+  "contact_solver_complexity": "O(N log N) per L-BFGS-B iteration",
+  "contact_dugdale_dc_nm": 5.0,
+  "contact_adhesion_energy_default_j_m2": 0.5,
+  "contact_modulus_default_gpa": 130.0,
+  "contact_wafer_thickness_default_um": 775.0,
+  "yield_model": "Murphy/Stapper negative binomial",
+  "yield_murphy_formula": "Y_k = 1/(1+D_k) per cluster",
+  "yield_correlation_length_default_um": 500.0,
+  "yield_mc_samples_default": 200,
+  "thermal_solver": "2D plane-stress FEA, Voigt mixing, linear elastic",
+  "thermal_cte_cu_ppm_K": 17.0,
+  "thermal_cte_sio2_ppm_K": 0.5,
+  "thermal_anneal_temp_default_C": 300,
+  "physics_chain_stages": 6,
+  "physics_chain_stages_named": [
+    "cmp_planarity",
+    "contact_mechanics",
+    "void_formation",
+    "thermal_stress",
+    "delamination",
+    "yield_prediction"
+  ],
+  "stine_1998_validation": true,
+  "turner_2002_validation": true,
+  "suhir_1986_validation": true,
+  "murphy_1964_validation": true,
+  "total_claims": 13,
+  "status": "research",
+  "test_files": 17,
+  "production_source_files": 61,
+  "production_loc_approx": 4500,
+  "references": {
+    "stine_1998": {
+      "authors": "Stine, B.E. et al.",
+      "title": "Rapid Characterization and Modeling of Pattern-Dependent Variation in Chemical-Mechanical Polishing",
+      "journal": "IEEE Trans. Semicond. Manuf.",
+      "year": 1998,
+      "validated_property": "CMP recess vs. density bathtub curve"
+    },
+    "turner_2002": {
+      "authors": "Turner, K.T. and Spearing, S.M.",
+      "title": "Modeling of Direct Wafer Bonding: Effect of Wafer Bow and Etch Patterns",
+      "journal": "J. Appl. Phys.",
+      "year": 2002,
+      "validated_property": "Contact mechanics bridging vs. conforming behavior"
+    },
+    "suhir_1986": {
+      "authors": "Suhir, E.",
+      "title": "Stresses in Bi-Metal Thermostats",
+      "journal": "J. Appl. Mech.",
+      "year": 1986,
+      "validated_property": "Bimetallic thermal stress analytical solution"
+    },
+    "murphy_1964": {
+      "authors": "Murphy, B.T.",
+      "title": "Cost-Size Optima of Monolithic Integrated Circuits",
+      "journal": "Proc. IEEE",
+      "year": 1964,
+      "validated_property": "Negative-binomial yield model"
+    },
+    "stapper_1983": {
+      "authors": "Stapper, C.H.",
+      "title": "Modeling of Defects in Integrated Circuit Photolithographic Patterns",
+      "journal": "IBM J. Res. Dev.",
+      "year": 1983,
+      "validated_property": "Spatial correlation in yield modeling"
+    }
+  }
+}

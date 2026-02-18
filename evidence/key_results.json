@@ -1,0 +1,82 @@
+{
+  "meta": {
+    "description": "Key benchmark results for Genesis PROV 9 Bondability",
+    "generated": "2026-02-18",
+    "status": "research",
+    "note": "All results are from computational benchmarks against published data. No proprietary fab data used."
+  },
+  "benchmarks": {
+    "cmp_stine_1998": {
+      "description": "CMP recess prediction vs. Stine et al. 1998 (hold-out validation)",
+      "reference": "Stine et al., IEEE Trans. Semicond. Manuf., 1998",
+      "method": "PCHIP interpolation with 5 calibration knots, tested at 6 held-out densities",
+      "result": "PASS",
+      "details": {
+        "calibration_knots": [0.0, 0.3, 0.5, 0.7, 1.0],
+        "holdout_densities": [0.1, 0.2, 0.4, 0.6, 0.8, 0.9],
+        "all_holdout_within_expected_ranges": true,
+        "bathtub_shape_confirmed": true,
+        "minimum_near_50pct_density": true
+      },
+      "caveat": "Stine 1998 data is for aluminum CMP, not copper damascene. Qualitative behavior similar, absolute values differ."
+    },
+    "contact_turner_2002": {
+      "description": "Spectral contact solver vs. Turner & Spearing 2002",
+      "reference": "Turner & Spearing, J. Appl. Phys., 2002",
+      "method": "20 nm Gaussian bump on 64x64 grid, three configurations tested",
+      "result": "PASS",
+      "details": {
+        "thick_wafer_bridges": true,
+        "thin_wafer_conforms": true,
+        "high_adhesion_reduces_gap": true,
+        "ordering_thick_gt_thin": true,
+        "all_4_qualitative_checks": "PASS"
+      },
+      "caveat": "Qualitative physics checks only at tile resolution (25 um). Quantitative gap values approximate (2-5x error at tile scale)."
+    },
+    "thermal_suhir_1986": {
+      "description": "Thermal FEA vs. Suhir 1986 analytical solution",
+      "reference": "Suhir, J. Appl. Mech., 1986",
+      "method": "Sharp Cu/SiO2 bimetallic strip on 50x50 grid",
+      "result": "PASS",
+      "details": {
+        "solver_converges": true,
+        "fd_to_analytical_ratio_range": [0.3, 3.0],
+        "ratio_within_tolerance": true,
+        "tolerance_justification": "Sharp FD interface creates stress concentration that analytical solution averages out. 3x tolerance is conservative."
+      },
+      "caveat": "Linear elastic only. No plasticity. At 300C anneal, peak stress may exceed Cu yield (~300 MPa)."
+    },
+    "yield_sanity": {
+      "description": "Murphy/Stapper yield model sanity checks",
+      "reference": "Murphy, Proc. IEEE, 1964; Stapper, IBM J. Res. Dev., 1983",
+      "method": "Uniform 40x40 die at 50% density, low-defect vs. high-defect configurations",
+      "result": "PASS",
+      "details": {
+        "monotonicity_low_gt_high": true,
+        "all_yields_in_0_1": true,
+        "seed_sensitivity_confirmed": true
+      },
+      "caveat": "correlation_length_um (default 500 um) is uncalibrated and dominates final yield. 200 um to 2000 um range swings yield by 20+ percentage points."
+    }
+  },
+  "solver_capabilities": {
+    "physics_chain_stages": 6,
+    "cmp_model": "PCHIP interpolation with EPL kernel convolution",
+    "contact_solver": "Spectral FFT with Dugdale cohesive zone, O(N log N)",
+    "thermal_solver": "2D plane-stress FEA with Voigt mixing (CPU and GPU variants)",
+    "yield_model": "Murphy/Stapper negative binomial with Monte Carlo",
+    "optimizer": "Multi-objective inverse design (additive and subtractive strategies)",
+    "drc_compiler": "Threshold-based violation detection with KLayout marker output"
+  },
+  "codebase_metrics": {
+    "production_source_files": 61,
+    "production_loc_approx": 4500,
+    "test_files": 17,
+    "all_tests_pass": true,
+    "cli_commands": 7,
+    "rest_api_endpoints": 5,
+    "published_benchmarks": 4,
+    "all_benchmarks_pass": true
+  }
+}

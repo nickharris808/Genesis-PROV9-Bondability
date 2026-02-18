@@ -1,0 +1,5 @@
+# Requirements for Genesis PROV 9: Bondability verification
+# The verify_claims.py script uses only Python standard library.
+# No external packages are required.
+#
+# Python >= 3.10
