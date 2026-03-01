@@ -433,7 +433,7 @@ After running 200 Monte Carlo trials, the engine computes quartile-based elastic
 
 | Parameter | Typical Elasticity | Interpretation |
 |---|---|---|
-| `correlation_length_um` | **Dominant** (~0.3-0.8) | Most impactful tunable -- must calibrate to fab data |
+| `correlation_length_um` | **Dominant** (~0.3-0.8) | Uncalibrated -- this single parameter dominates yield by ~100x; use for relative layout comparison, not absolute prediction |
 | `overlay_sigma_nm` | High (~0.2-0.4) | Overlay capability directly impacts open-bond risk |
 | `particle_density_cm2` | Moderate (~0.1-0.3) | Particle contamination affects random yield |
 | `surface_roughness_nm` | Moderate (~0.1-0.2) | Roughness affects snap-in threshold for void closure |
@@ -500,7 +500,7 @@ This analysis identifies which process improvements will have the largest impact
 | 70% | 8 nm | Erosion onset |
 | 100% | 20 nm | Significant erosion |
 
-**Important:** Users MUST replace default calibration with fab-specific Cu CMP measurements for production use. The calibration module supports loading custom fab data via YAML configuration or programmatic API.
+**Important:** The default now uses the copper_hybrid_bonding preset (Enquist 2019, Kim 2022), but users MUST replace with fab-specific Cu CMP measurements for production use. The calibration module supports loading custom fab data via YAML configuration or programmatic API.
 
 ### Stage 3: Contact Mechanics (Spectral FFT Solver)
 
@@ -634,7 +634,7 @@ The CMP model uses PCHIP interpolation calibrated to 5 data points from publishe
 - Monotonic decrease from 0% to 50%, monotonic increase from 50% to 100%
 - PCHIP interpolation avoids overshoot artifacts
 
-**Caveat:** Stine 1998 data is for aluminum CMP. The default production calibration uses copper CMP values from Ouma et al. 2002. Both show the bathtub shape; copper has higher absolute recess values due to softer material.
+**Caveat:** Stine 1998 data is for aluminum CMP (legacy). The default production calibration now uses the copper_hybrid_bonding preset (Enquist 2019, Kim 2022). Both show the bathtub shape; copper has higher absolute recess values due to softer material.
 
 ### Benchmark 2: Contact Mechanics (Turner & Spearing 2002)
 
@@ -942,11 +942,11 @@ None of these benchmarks use proprietary data from TSMC, Samsung, Intel, or any 
 
 ### 4. CMP Calibration Requirements
 
-The default CMP calibration has two presets:
-- **Copper (default):** Ouma et al. 2002 Cu damascene data. Higher recess values than aluminum.
-- **Aluminum (legacy):** Stine et al. 1998 Al CMP data. Retained for comparison.
+The default CMP calibration now uses the **copper_hybrid_bonding** preset (based on Enquist 2019, Kim 2022). Two presets are available:
+- **copper_hybrid_bonding (default):** Cu CMP data calibrated for hybrid bonding applications (Enquist 2019, Kim 2022). This replaces the previous aluminum-based default.
+- **Aluminum (legacy):** Stine et al. 1998 Al CMP data. Retained for comparison only.
 
-Both are published academic data, not fab-specific production data. **Any production deployment MUST replace the default calibration with fab-specific Cu CMP measurements.** This is the single most critical calibration item. The platform includes a calibration module for loading custom data.
+The copper_hybrid_bonding preset is based on published academic data (Enquist 2019, Kim 2022), not fab-specific production data. **Any production deployment MUST replace the default calibration with fab-specific Cu CMP measurements.** This is the single most critical calibration item. The platform includes a calibration module for loading custom data.
 
 ### 5. Spectral FFT Is a Standard Technique
 
@@ -960,7 +960,7 @@ Implementing proper incremental plasticity (load stepping, tangent stiffness upd
 
 ### 7. Correlation Length Dominates Yield
 
-The yield model's `correlation_length_um` parameter (default 500 um) is the single most impactful tunable on final yield numbers. Changing it from 200 um to 2000 um can swing yield by 20+ percentage points. The default is a reasonable starting point from literature but is uncalibrated. Any quantitative yield prediction requires calibrating this parameter against actual fab yield measurements.
+The yield model's `correlation_length_um` parameter (default 500 um) is uncalibrated and dominates yield predictions by ~100x. Changing it from 200 um to 2000 um can swing yield by 20+ percentage points. This single parameter is the most impactful tunable on final yield numbers. **Use for relative layout comparison only, not absolute prediction.** Any quantitative yield prediction requires calibrating this parameter against actual fab yield measurements.
 
 ### 8. Contact Solver Under-Resolution at Tile Scale
 
@@ -1191,8 +1191,8 @@ yield_model:
 
 | Parameter | Default | What to Replace With | Priority |
 |---|---|---|---|
-| `cmp.recess_nm_at_density` | Ouma 2002 Cu data | Fab-specific Cu CMP measurements | **Critical** |
-| `yield_model.correlation_length_um` | 500 um | Fab defect spatial correlation data | **Critical** |
+| `cmp.recess_nm_at_density` | copper_hybrid_bonding preset (Enquist 2019, Kim 2022) | Fab-specific Cu CMP measurements | **Critical** |
+| `yield_model.correlation_length_um` | 500 um (uncalibrated -- dominates yield by ~100x; use for relative comparison only) | Fab defect spatial correlation data | **Critical** |
 | `bonding.overlay_sigma_nm` | 20 nm | Actual overlay capability (from bonding tool) | **High** |
 | `anneal.anneal_temp_C` | 300 C | Actual anneal recipe temperature | **High** |
 | `bonding.particle_density_cm2` | 0.5 /cm^2 | Fab particle monitoring data | **Medium** |
@@ -1205,7 +1205,7 @@ yield_model:
 ## Appendix C: Frequently Asked Questions
 
 **Q: Can I use this to predict yield in my fab?**
-A: Not directly, not yet. The default calibration uses published academic data. You must replace the CMP calibration with your fab-specific measurements, calibrate the correlation length against your yield data, and validate the contact mechanics against your bonding process. The platform provides the physics framework; you provide the calibration data.
+A: Not directly, not yet. The default calibration now uses the copper_hybrid_bonding preset (Enquist 2019, Kim 2022), which is more appropriate than the previous aluminum default, but is still published academic data. You must replace the CMP calibration with your fab-specific measurements, calibrate the correlation_length_um against your yield data (this single uncalibrated parameter dominates yield by ~100x), and validate the contact mechanics against your bonding process. The platform provides the physics framework; you provide the calibration data.
 
 **Q: How does this compare to what TSMC/Intel/Samsung use internally?**
 A: We do not know what these foundries use internally -- their yield prediction tools are proprietary. Bondability is likely simpler in some respects (2D not 3D, linear elastic, no multi-layer CMP) and more integrated in others (full physics chain from GDS to yield in one tool). The key difference is that Bondability is available for research evaluation.
