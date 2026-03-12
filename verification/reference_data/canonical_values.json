@@ -5,8 +5,13 @@
     "status": "research"
   },
   "cmp_model": "Preston equation with PCHIP profile",
-  "cmp_calibration_source": "Stine et al. 1998 (aluminum CMP -- NOT copper)",
-  "cmp_calibration_knots": {
+  "cmp_calibration_source": "Default: copper_hybrid_bonding (Enquist 2019, Kim 2022). Legacy: Stine et al. 1998 (aluminum CMP -- NOT copper)",
+  "cmp_default_preset": "copper_hybrid_bonding",
+  "cmp_calibration_knots_copper_hybrid_bonding": {
+    "densities": [0.0, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1.0],
+    "recess_nm": [15.0, 7.0, 5.0, 3.5, 2.5, 3.5, 5.0, 8.0, 12.0]
+  },
+  "cmp_calibration_knots_aluminum_legacy": {
     "densities": [0.0, 0.3, 0.5, 0.7, 1.0],
     "recess_nm": [25.0, 10.0, 5.0, 8.0, 20.0]
   },
@@ -21,6 +26,7 @@
   "yield_murphy_formula": "Y_k = 1/(1+D_k) per cluster",
   "yield_correlation_length_default_um": 500.0,
   "yield_mc_samples_default": 200,
+  "yield_mc_samples_note": "200 is for demo speed only; use >=1000 for reliable quantile estimates",
   "thermal_solver": "2D plane-stress FEA, Voigt mixing, linear elastic",
   "thermal_cte_cu_ppm_K": 17.0,
   "thermal_cte_sio2_ppm_K": 0.5,

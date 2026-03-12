@@ -18,7 +18,7 @@
 
 **Description:** A CMP recess prediction method using Effective Planarization Length (EPL) kernel convolution and PCHIP interpolation to map local pad density to surface topography (recess in nanometers), derived from the pressure-velocity dependence in the Preston equation.
 
-**Status:** Research. Calibrated to Stine et al. 1998 data (aluminum CMP). Hold-out validation at 6 non-calibration density points. Default calibration is aluminum, not copper -- must be replaced for production use.
+**Status:** Research. Default CMP preset is `copper_hybrid_bonding` (Enquist 2019, Kim 2022), with ~3x lower recess than standard Cu damascene. Legacy aluminum calibration (Stine et al. 1998) retained for comparison. Hold-out validation at 6 non-calibration density points. All CMP presets are from published literature, not proprietary fab data -- must be replaced with actual fab measurements for production use.
 
 ---
 
@@ -42,7 +42,7 @@
 
 **Description:** A Monte Carlo yield prediction engine that samples process parameter distributions (overlay sigma, particle density, surface roughness) and propagates uncertainty through the full physics chain to produce yield distributions (P10/P50/P90) with sensitivity analysis.
 
-**Status:** Research. Sensitivity analysis identifies correlation_length_um as dominant parameter. 200 MC samples by default. Validated for monotonicity, bounds, and seed sensitivity.
+**Status:** Research. Sensitivity analysis identifies correlation_length_um as dominant parameter (yield swing of 40-99% across plausible range; see HONEST_DISCLOSURES.md #7). 200 MC samples by default (below convergence minimum of 1,000; see HONEST_DISCLOSURES.md #14). Validated for monotonicity, bounds, and seed sensitivity.
 
 ---
 

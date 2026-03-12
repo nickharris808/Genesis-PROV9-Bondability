@@ -142,4 +142,24 @@ All tests pass. This demonstrates code quality, internal consistency, and correc
 
 ---
 
+## 14. Monte Carlo Samples Default (200) Is Below Convergence Minimum
+
+The default `monte_carlo_samples=200` throughout the codebase (config.py, process YAML files, validation benchmarks) is below the generally accepted minimum of 1,000 samples for Monte Carlo convergence of yield distributions. At 200 samples, P10/P90 quantile estimates have high variance and are not statistically reliable. The yield_p50 (median) is more robust but still carries significant sampling noise.
+
+**Users should increase `monte_carlo_samples` to at least 1,000 (preferably 5,000-10,000) for any quantitative yield prediction.** The default of 200 was chosen for demo speed, not statistical rigor.
+
+---
+
+## 15. Void Risk Model Behavior at Low Density
+
+The logistic void risk model (`p_void = 1/(1 + exp(-k*(gap - snap_in)))`) produces p_void approaching 1.0 for all tiles when the surface gap significantly exceeds the snap-in threshold (~9 nm). This is physically correct -- if the surface gap is much larger than the adhesion pull-in distance, bonding cannot occur. However, this means:
+
+- Layouts with very low pad density (e.g., <5%) will produce gap >> snap_in, resulting in p_void near 1.0 for every tile, and therefore yield near 0.0.
+- This is not a bug but rather the correct prediction for unrealistic layouts.
+- For layouts near the snap-in threshold, small changes in CMP recess or roughness can swing p_void dramatically, which is the root cause of the correlation_length sensitivity documented in Disclosure #7.
+
+The logistic steepness parameter `k_void_logistic = 2.0` was chosen to represent the statistical ensemble of surface roughness asperities. It is not calibrated to experimental void rate data.
+
+---
+
 *This disclosure document is part of the non-confidential public repository for Genesis PROV 9: Bondability. It is intended to provide a candid, honest assessment of the current state of the research platform.*
