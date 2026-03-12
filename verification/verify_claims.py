@@ -68,6 +68,13 @@ def check_cmp_recess() -> None:
     """
     print("\nCheck 1: CMP Recess Prediction vs. Stine 1998")
     print("-" * 50)
+    print("  WARNING: Stine et al. 1998 calibration data is for aluminum CMP")
+    print("  (Al interconnect polishing). The Genesis bondability pipeline uses")
+    print("  copper-copper (Cu-Cu) hybrid bonding. Aluminum and copper have")
+    print("  different hardness, removal rates, and dishing behavior. This")
+    print("  calibration is a proxy only; Cu-specific CMP data (e.g., from")
+    print("  Stavreva et al. 1997 or Luo & Dornfeld 2003) should be used for")
+    print("  production validation.")
 
     # Calibration knots from Stine 1998 (density -> recess_nm)
     cal_densities = [0.0, 0.3, 0.5, 0.7, 1.0]
@@ -146,7 +153,7 @@ def check_contact_mechanics() -> None:
     print("-" * 50)
 
     # Material properties (silicon wafer)
-    E_gpa = 130.0         # Young's modulus (GPa)
+    E_gpa = 170.0         # Si(100) single crystal, Hopcroft et al. 2010
     E_pa = E_gpa * 1e9    # Convert to Pa
     nu = 0.28             # Poisson ratio
     gamma = 0.5           # Adhesion energy (J/m^2) -- typical for activated Si
