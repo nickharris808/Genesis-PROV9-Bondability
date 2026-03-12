@@ -1,1232 +1,1538 @@
-# Genesis PROV 9: Bondability
+# Bondability-D2W: Patent Data Room -- Comprehensive Technical Inventory
 
-## Physics-Based Hybrid Bonding Yield Prediction from GDS Layout to Manufacturing Outcome
+> Multi-physics simulation platform for hybrid bonding (Cu-Cu direct bonding)
+> yield prediction in semiconductor manufacturing.
 
-**Status:** Research (v2.0)
-**Claims:** 13 research-stage claims (not yet provisional patent)
-**Validation:** Benchmarked against Stine 1998, Turner 2002, Suhir 1986, Murphy 1964
-**Codebase:** 61 production Python source files | ~4,500 LOC | 17 test files (all passing)
-**Interfaces:** 7 CLI commands | 5 REST API endpoints | Python API
-**License:** CC BY-NC-ND 4.0
+**Version:** 2.0.0 | **License:** MIT | **Python:** >=3.10
+
+**Codebase:** ~61 production Python source files, ~13,000 LOC
+**Tests:** 17 test files, all passing
+**Interfaces:** 7 CLI commands, 5 REST API endpoints, Python API
 
 ---
 
 ## Table of Contents
 
-1. [Executive Summary](#executive-summary)
-2. [Why This Matters: The Hybrid Bonding Imperative](#why-this-matters-the-hybrid-bonding-imperative)
-3. [The Problem: No Tool Does GDS-to-Yield](#the-problem-no-tool-does-gds-to-yield)
-4. [The Bondability Solution: Six-Stage Physics Chain](#the-bondability-solution-six-stage-physics-chain)
-5. [Architecture Deep Dive](#architecture-deep-dive)
-6. [Spectral FFT Contact Solver](#spectral-fft-contact-solver)
-7. [Monte Carlo Yield Engine](#monte-carlo-yield-engine)
-8. [Methodology: Stage-by-Stage Technical Detail](#methodology-stage-by-stage-technical-detail)
-9. [Validated Results](#validated-results)
-10. [Comparison: Bondability vs. Existing Tools](#comparison-bondability-vs-existing-tools)
-11. [Key Discoveries and Innovations](#key-discoveries-and-innovations)
-12. [Applications](#applications)
-13. [Cross-Platform Integration](#cross-platform-integration)
-14. [Research-Stage Patent Portfolio](#research-stage-patent-portfolio)
-15. [Honest Disclosures](#honest-disclosures)
-16. [Evidence and Verification](#evidence-and-verification)
-17. [Repository Structure](#repository-structure)
-18. [Citation and References](#citation-and-references)
+1.  [Executive Summary](#1-executive-summary)
+2.  [Quick Start](#2-quick-start)
+3.  [Physics Pipeline](#3-physics-pipeline)
+4.  [Complete Directory Tree](#4-complete-directory-tree)
+5.  [Complete Python File Inventory](#5-complete-python-file-inventory)
+6.  [Output Files Inventory](#6-output-files-inventory)
+7.  [CLI Reference](#7-cli-reference)
+8.  [REST API Reference](#8-rest-api-reference)
+9.  [Python API Reference](#9-python-api-reference)
+10. [Physics Solvers Detail](#10-physics-solvers-detail)
+11. [Configuration Reference](#11-configuration-reference)
+12. [Test Suite](#12-test-suite)
+13. [Validation Benchmarks](#13-validation-benchmarks)
+14. [Dependencies](#14-dependencies)
+15. [Known Limitations](#15-known-limitations)
+16. [Buyer Due Diligence Checklist](#16-buyer-due-diligence-checklist)
 
 ---
 
-## Executive Summary
+## 1. Executive Summary
 
-Hybrid bonding -- direct Cu-Cu thermocompression bonding -- is the critical interconnect technology enabling High Bandwidth Memory (HBM), 3D chiplet stacking, and advanced heterogeneous integration. Every HBM4 stack, every TSMC SoIC chiplet assembly, every Intel Foveros package, and every Samsung X-Cube module depends on hybrid bonding to achieve the sub-10 um pad pitches and million-connection-per-mm^2 interconnect densities that conventional solder bumping cannot reach.
+### What Bondability-D2W Does
 
-The fundamental problem is that hybrid bonding yield is notoriously difficult to predict before silicon. The physics chain from layout to yield outcome spans six tightly coupled domains: CMP planarity determines surface topography; surface topography governs contact mechanics at the bond interface; contact mechanics determines void formation; post-bond anneal creates thermal stress from CTE mismatch; thermal stress drives delamination risk; and the spatial distribution of all these failure modes determines die-level yield. Current industry practice handles this chain empirically -- through expensive post-silicon yield learning, rule-of-thumb density guidelines, and iterative process tuning that costs tens of millions of dollars and months of calendar time per product generation.
+Bondability-D2W predicts the yield of hybrid-bonded (Cu-Cu direct bonding)
+semiconductor dies by simulating the coupled physics chain from GDS layout
+through manufacturing to final yield:
 
-**Bondability** models the complete physics chain computationally. It accepts a GDS/OASIS layout as input and predicts hybrid bonding yield as output, propagating uncertainty through every stage via Monte Carlo sampling. The solver architecture uses:
+```
+GDS/OASIS Layout
+    |
+    v
+Feature Extraction (pad density, motifs, gradients)
+    |
+    v
+CMP Recess Prediction (PCHIP + EPL kernel)
+    |
+    v
+Contact Mechanics (Spectral FFT + Dugdale cohesive zone)
+    |
+    v
+Thermal Stress Analysis (2D plane-stress FEA, CPU + GPU)
+    |
+    v
+Monte Carlo Yield (Murphy/Stapper model with spatial correlation)
+    |
+    v
+DRC Rule Compilation + Inverse Design Optimization
+    |
+    v
+HTML Signoff Report + KLayout DRC Markers + Risk Maps
+```
 
-- **Spectral FFT contact mechanics** with O(N log N) computational complexity per iteration
-- **PCHIP-interpolated CMP prediction** calibrated against published data (Stine 1998, Ouma 2002)
-- **Dugdale cohesive zone modeling** for adhesion at the Cu-Cu bond interface
-- **Plane-stress thermal FEA** for post-bond anneal stress computation (CPU and GPU variants)
-- **Murphy/Stapper negative-binomial yield model** with spatial defect correlation and Monte Carlo uncertainty quantification
-- **Multi-objective inverse design optimization** for gradient-compensated dummy fill
+### Value Proposition
 
-The platform has been validated against four independent published benchmarks. 17 test files exercise all solver modules, the end-to-end pipeline, CLI commands, REST API endpoints, and adversarial edge cases. All tests pass. It is research-status software -- computationally complete, architecturally sound, and honest about what it does and does not demonstrate.
+Hybrid bonding is the critical interconnect technology for advanced 3D
+stacking (HBM, chiplets, CoWoS). Current industry practice relies on
+post-silicon yield learning -- expensive and slow. Bondability-D2W moves
+yield prediction to the design stage by:
 
-This is not a production EDA tool. It is a research platform that demonstrates that physics-based GDS-to-yield prediction for hybrid bonding is computationally feasible, architecturally tractable, and scientifically grounded. The path from here to production requires fab-specific calibration, experimental validation, and integration with foundry design flows.
+1. **Physics-based prediction**, not empirical curve fitting. Each solver
+   implements published, peer-reviewed models (Stine 1998, Turner 2002,
+   Suhir 1986, Murphy 1964, Stapper 1983).
+
+2. **GDS-in, yield-out pipeline**. Accepts real GDSII/OASIS layouts via
+   gdstk, extracts pad density maps, and produces per-tile risk maps,
+   yield distributions, and actionable DRC markers.
+
+3. **Inverse design optimizer**. Multi-objective fill optimization that
+   jointly minimizes void risk, delamination risk, CMP non-uniformity,
+   and thermal stress. Both additive (hill-climbing) and subtractive
+   (stress-minimizing) strategies.
+
+4. **Self-validation**. Built-in benchmarks that compare solver outputs
+   against published data with hold-out validation (not circular).
+
+5. **Production-grade interfaces**. CLI (Typer + Rich), REST API
+   (FastAPI + Swagger), Python API, and HTML report generation.
+
+### Critical Calibration Notice
+
+**CMP DEFAULT CALIBRATION: `copper_hybrid_bonding` preset.** The default
+recess-vs-density curve now uses the `copper_hybrid_bonding` CMP preset
+(recess ~2.5 nm at optimal density, from Enquist 2019, Kim 2022). The
+original Stine et al. 1998 aluminum calibration is still available as a
+fallback. **For production deployment, replace with fab-specific Cu CMP
+measurements** using the built-in calibration module
+(`bondability.cmp.calibration`) or manual YAML editing. See Section 15.1.
+
+### What This Is NOT
+
+This is not a first-principles CMP simulator (no Preston equation, no
+slurry chemistry). It is not a TCAD tool. The CMP module is a calibrated
+empirical model. The thermal solver is linear elastic (no plasticity).
+The contact solver uses Dugdale approximation (not full JKR). These are
+documented, understood, and appropriate trade-offs for the design-stage
+screening use case.
 
 ---
 
-## Why This Matters: The Hybrid Bonding Imperative
+## 2. Quick Start
 
-### The $100 Billion Question
+### Installation
 
-The semiconductor industry's roadmap for continued performance scaling has fundamentally shifted from transistor shrinking to 3D integration. Moore's Law transistor density improvements are slowing -- the cost per transistor at sub-3nm nodes is no longer decreasing. The path forward is stacking dies vertically and connecting them with high-density interconnects. Hybrid bonding is the only interconnect technology capable of delivering the required pad pitches for this next era of semiconductor manufacturing.
+```bash
+# From source (core dependencies only)
+pip install -e .
 
-The numbers are stark:
+# With development tools (pytest, ruff, mypy)
+pip install -e ".[dev]"
 
-| Technology | Minimum Pitch | Interconnect Density | Key Applications |
-|---|---|---|---|
-| Solder C4 bumps | ~130 um | ~60 connections/mm^2 | Legacy flip-chip |
-| Microbumps (Cu pillar) | ~40 um | ~625 connections/mm^2 | HBM3, 2.5D interposers |
-| **Hybrid bonding** | **~1 um (demonstrated)** | **~1,000,000 connections/mm^2** | **HBM4, SoIC, Foveros** |
+# With GPU support (PyTorch for thermal solver)
+pip install -e ".[opt]"
 
-That is a **1,600x improvement** in interconnect density from microbumps to hybrid bonding. This density enables architectures that are physically impossible with any other interconnect technology.
+# With REST API server (FastAPI + uvicorn)
+pip install -e ".[api]"
 
-### Market Context
-
-HBM (High Bandwidth Memory) is the most visible application. HBM4, entering volume production in 2025-2026, uses hybrid bonding for its memory die stacks. The HBM market alone is projected to exceed $30 billion annually by 2026, driven almost entirely by AI/ML training and inference workloads that require massive memory bandwidth. Every NVIDIA H100, B100, and successor GPU depends on HBM. Every Google TPU, every AWS Trainium, every Meta MTIA chip requires HBM stacks.
-
-Beyond HBM:
-
-- **TSMC SoIC (System on Integrated Chips)** uses hybrid bonding for chiplet-to-chiplet integration, enabling Apple, AMD, and NVIDIA to build multi-die processors with bandwidth exceeding 1 TB/s between chiplets.
-- **Intel Foveros** enables logic-on-logic 3D stacking with face-to-face hybrid bonding, used in Meteor Lake and successor architectures for disaggregated tile packaging.
-- **Samsung X-Cube** provides 3D chiplet stacking for their foundry customers, competing directly with TSMC SoIC.
-- **ASE (Advanced Semiconductor Engineering)** is developing hybrid bonding OSAT capabilities for chiplet-to-wafer and wafer-to-wafer configurations.
-- **Sony image sensors** pioneered hybrid bonding at larger pitches for pixel-to-logic stacking, now moving to finer pitches.
-- **Logic-on-logic stacking** for backside power delivery networks (BSPDN) at Intel and TSMC.
-
-The total addressable market for advanced packaging -- the segment where hybrid bonding is the enabling technology -- is projected to reach $100 billion by 2030.
-
-### The Yield Problem: $1M+ Per Point
-
-In hybrid bonding, yield is everything. A single 300mm wafer carrying thousands of bonded dies can have billions of Cu-Cu bond pads, each of which must make reliable electrical contact. Consider the math:
-
-- A typical HBM4 die has ~65,000 hybrid bond pads at sub-10 um pitch
-- A 12-high HBM4 stack has 11 bonding interfaces, each with 65,000 pads
-- A single 300mm wafer carries ~1,000 dies
-- That is **~715 million bond pads per wafer** that must all work
-
-At wafer costs of $10,000-$50,000 per 300mm wafer through a hybrid bonding flow, and with typical yield learning campaigns requiring 50-200 wafers, a single yield learning cycle costs $0.5M-$10M. More critically, each design-fab-test iteration cycle takes 8-16 weeks. For HBM4 development, where multiple memory die designs must be co-optimized with the bonding process, the total yield learning cost reaches tens of millions of dollars per product generation.
-
-**A single percentage point of yield improvement on a high-volume HBM line is worth more than $1 million per year in gross margin.** For a high-volume line running 10,000 wafers per month at $15,000 per wafer with 1,000 dies per wafer, each yield point is worth:
-
-```
-10,000 wafers/month x 1,000 dies/wafer x 1% x $50 ASP per die = $5,000,000/month
+# Everything
+pip install -e ".[all]"
 ```
 
-This makes physics-based yield prediction -- even if initially approximate -- enormously valuable if it can reduce the number of experimental iterations by even one cycle.
+### Run the Full Pipeline on a Density Array
 
-### Why Nobody Has Done This Before
+```bash
+bondability run --input examples/demo.npy --output results/
+```
 
-The six-stage physics chain from layout to yield crosses traditional EDA tool boundaries:
+### Run on a GDS Layout
 
-1. **CMP simulation** lives in the process modeling world (KLA, Synopsys PrimeYield)
-2. **Contact mechanics** lives in the MEMS/tribology world (COMSOL, Abaqus)
-3. **Thermal stress** lives in the thermal simulation world (Ansys Icepak, Synopsys)
-4. **Yield modeling** lives in the yield management world (PDF Solutions, Synopsys)
-5. **DRC** lives in the physical verification world (Calibre, ICV)
+```bash
+bondability run --input design.gds --layer 10 --config configs/process_example.yaml --output results/
+```
 
-No single EDA vendor has a team that spans all five domains. Building the integrated chain requires expertise in CMP modeling, contact mechanics, computational mechanics, yield statistics, and semiconductor process physics -- simultaneously. The organizational boundaries between EDA product groups mirror the technical boundaries between these domains. That is the gap Bondability fills.
+### Run with Fill Optimization
+
+```bash
+bondability run --input layout.npy --config configs/process_example.yaml --optimize --output results/
+```
+
+### Run Validation Benchmarks
+
+```bash
+bondability benchmark
+```
+
+### Start the REST API Server
+
+```bash
+bondability serve --host 0.0.0.0 --port 8000
+# Swagger docs at http://0.0.0.0:8000/docs
+```
+
+### Python API
+
+```python
+from bondability.pipeline import run_pipeline
+from pathlib import Path
+
+result = run_pipeline(
+    gds_path=Path("design.gds"),
+    process_yaml=Path("configs/process_example.yaml"),
+    out_dir=Path("results/"),
+    pad_layer=10,
+    tile_um=25.0,
+)
+
+print(f"Yield P50: {result['yield_summary']['yield_p50']:.1%}")
+print(f"Void hotspots: {result['rules_summary']['hot_void_frac']:.1%}")
+```
 
 ---
 
-## The Problem: No Tool Does GDS-to-Yield
+## 3. Physics Pipeline
 
-### The Physics of Failure
-
-A hybrid bond fails or succeeds based on a chain of coupled physical processes. Each stage feeds into the next, and failure at any stage can propagate downstream:
-
-```mermaid
-flowchart TD
-    A["GDS/OASIS Layout\n(pad density, gradients, motifs)"] --> B["CMP Planarity\n(recess, dishing, erosion)"]
-    B --> C["Contact Mechanics\n(bridging vs. conforming)"]
-    C --> D["Void Formation\n(trapped gas, unbonded area)"]
-    D --> E["Thermal Stress\n(CTE mismatch @ 300C anneal)"]
-    E --> F["Delamination Risk\n(interface fracture)"]
-    F --> G["Die-Level Yield\n(Murphy/Stapper spatial model)"]
-
-    style A fill:#1a1a2e,stroke:#e94560,color:#fff
-    style B fill:#1a1a2e,stroke:#e94560,color:#fff
-    style C fill:#1a1a2e,stroke:#0f3460,color:#fff
-    style D fill:#1a1a2e,stroke:#0f3460,color:#fff
-    style E fill:#1a1a2e,stroke:#16213e,color:#fff
-    style F fill:#1a1a2e,stroke:#16213e,color:#fff
-    style G fill:#1a1a2e,stroke:#533483,color:#fff
-```
-
-**Stage 1 -- CMP Non-Uniformity.** Chemical-mechanical polishing must planarize the Cu surface to sub-nanometer roughness, but local pattern density creates systematic height variations. Low-density regions experience dishing (Cu recesses below dielectric); high-density regions experience erosion (dielectric thins). The relationship between density and recess follows a well-documented "bathtub curve" (Stine et al. 1998, Ouma et al. 2002). This means layout decisions made at the GDS level -- pad placement, dummy fill patterns, density gradients -- directly determine the post-CMP surface topography that the bonding process must accommodate.
-
-**Stage 2 -- Contact Mechanics.** After CMP, two wafer surfaces must achieve intimate contact across the entire die area. Any residual topography from CMP creates gaps. Whether these gaps close during bonding depends on wafer thickness (stiff thick wafers bridge over features; flexible thin wafers conform), adhesion energy (stronger adhesion pulls surfaces together), and the spatial frequency content of the topography. This is a classical contact mechanics problem, solvable via spectral (Fourier-domain) methods.
-
-**Stage 3 -- Void Formation.** Gaps that do not close during initial bonding become trapped voids. These voids prevent electrical contact at affected Cu pads. The void distribution is a spatial random field correlated with CMP topography and contact mechanics outcomes. Voids above a critical size (~1 um) cause open-circuit defects.
-
-**Stage 4 -- Thermal Stress.** Post-bond annealing at 200-400C drives Cu grain growth and diffusion across the bond interface, strengthening the bond. But it simultaneously creates thermal stress from the CTE mismatch between Cu (17 ppm/K) and SiO2 dielectric (0.5 ppm/K). This stress is pattern-dependent: sharp density transitions create stress concentrations.
-
-**Stage 5 -- Delamination.** If thermal stress exceeds the interface fracture toughness, delamination occurs. The crack driving force depends on the elastic strain energy release rate, which in turn depends on local density patterns, flaw sizes, and the competition between elastic energy and adhesion.
-
-**Stage 6 -- Die-Level Yield.** The spatial distribution of failure probabilities across all tiles of the die determines whether the die passes or fails. Defects are not independent -- they cluster spatially due to the systematic nature of CMP and thermal stress patterns. This spatial correlation is captured by the Murphy/Stapper negative-binomial yield model.
-
-### The Gap in Existing Tools
-
-| Capability | CMP Tools (KLA, Synopsys) | FEA Tools (Ansys, COMSOL) | Yield Tools (PDF Solutions) | DRC (Calibre) | **Bondability** |
-|---|---|---|---|---|---|
-| CMP topography prediction | Yes | No | No | No | **Yes** |
-| Contact mechanics | No | Manual setup | No | No | **Yes (automated)** |
-| Void formation modeling | No | No | No | No | **Yes** |
-| Thermal stress (CTE) | No | Yes (manual) | No | No | **Yes (automated)** |
-| Yield prediction | No | No | Yes (empirical) | No | **Yes (physics-based)** |
-| GDS input | Yes | No | No | Yes | **Yes** |
-| End-to-end pipeline | No | No | No | No | **Yes** |
-| Uncertainty quantification | Limited | No | Limited | No | **Yes (Monte Carlo)** |
-| Inverse design optimization | No | No | No | No | **Yes** |
-
-No existing commercial tool models the complete chain. Bondability is, to our knowledge, the first open research platform that does.
-
----
-
-## The Bondability Solution: Six-Stage Physics Chain
-
-Bondability operates as a sequential six-stage pipeline where each stage consumes typed outputs from prior stages and produces typed results for downstream stages. The pipeline accepts GDS/OASIS layout files (or pre-computed density arrays) as input and produces yield predictions, risk maps, DRC violations, sensitivity analyses, and HTML signoff reports as output.
-
-```mermaid
-graph LR
-    subgraph Input
-        GDS["GDS/OASIS\nLayout"]
-        NPY["Pre-computed\nDensity Array"]
-    end
-
-    subgraph "Stage 1: Feature Extraction"
-        FE["Pad Density\nGradients\nMotif Detection"]
-    end
-
-    subgraph "Stage 2: CMP Prediction"
-        CMP["EPL Kernel\nPCHIP Interpolation\nBathtub Curve"]
-    end
-
-    subgraph "Stage 3: Contact Mechanics"
-        CM["Spectral FFT\nDugdale CZM\nL-BFGS-B Solver"]
-    end
-
-    subgraph "Stage 4: Thermal Stress"
-        TS["Voigt Mixing\nPlane-Stress FEA\nvon Mises Stress"]
-    end
-
-    subgraph "Stage 5: Monte Carlo Yield"
-        MC["Murphy/Stapper\nSpatial Correlation\n200 MC Samples"]
-    end
-
-    subgraph "Stage 6: DRC + Optimization"
-        DRC["Rule Compilation\nKLayout Markers\nInverse Design"]
-    end
-
-    subgraph Output
-        RPT["HTML Report\nYield P10/P50/P90\nRisk Maps\nViolation Masks"]
-    end
-
-    GDS --> FE
-    NPY --> FE
-    FE --> CMP
-    CMP --> CM
-    CM --> TS
-    TS --> MC
-    MC --> DRC
-    DRC --> RPT
-
-    style GDS fill:#0d1b2a,stroke:#778da9,color:#e0e1dd
-    style NPY fill:#0d1b2a,stroke:#778da9,color:#e0e1dd
-    style FE fill:#1b263b,stroke:#778da9,color:#e0e1dd
-    style CMP fill:#1b263b,stroke:#415a77,color:#e0e1dd
-    style CM fill:#1b263b,stroke:#415a77,color:#e0e1dd
-    style TS fill:#1b263b,stroke:#415a77,color:#e0e1dd
-    style MC fill:#1b263b,stroke:#415a77,color:#e0e1dd
-    style DRC fill:#1b263b,stroke:#778da9,color:#e0e1dd
-    style RPT fill:#0d1b2a,stroke:#778da9,color:#e0e1dd
-```
-
-### Pipeline Data Flow
-
-Each stage produces a typed dictionary that flows downstream. The key data fields at each stage:
-
-| Stage | Key Outputs | Data Types | Downstream Consumer |
-|---|---|---|---|
-| Feature Extraction | `density`, `density_grad`, `motif_masks`, `bbox_um` | `FeatureSet` dataclass | CMP, Bonding, Anneal, Yield |
-| CMP Prediction | `eff_density`, `recess_mean_nm`, `recess_sigma_nm`, `gap_nm`, `cmp_margin_index` | Dict[str, ndarray] | Contact, Yield, Rules |
-| Contact Mechanics | `void_risk`, `open_bond_risk`, `gap_nm` (solver), `explain` | Dict[str, ndarray] | Yield, Rules |
-| Thermal Stress | `stress_index`, `delam_risk`, `von_mises_MPa` | Dict[str, ndarray] | Yield, Rules |
-| Monte Carlo Yield | `samples` (yield array), `summary` (P10/P50/P90), `sensitivity` | Dict[str, Any] | Rules, Report |
-| DRC + Optimization | `violation_masks`, `suggestions`, `markers.lyrdb` | Dict + files | Report |
-
----
-
-## Architecture Deep Dive
-
-### Solver Architecture Overview
-
-The solver architecture is designed around three principles: (1) each physics stage uses the simplest model that captures the dominant physics, (2) computational cost scales as O(N log N) or better where possible, and (3) all parameters are configurable with honest defaults and documented calibration requirements.
-
-```mermaid
-graph TD
-    subgraph "Spectral FFT Contact Solver"
-        A["Surface Topology\n(from CMP)"] --> B["FFT to\nFourier Space"]
-        B --> C["Spectral Elastic Kernel\nD*K^4 + E*/(2*dx)"]
-        C --> D["Dugdale Adhesion\nsigma_max = gamma/dc"]
-        D --> E["L-BFGS-B\nEnergy Minimization"]
-        E --> F["IFFT to\nPhysical Space"]
-        F --> G["Equilibrium Gap\nField (nm)"]
-    end
-
-    subgraph "Key Properties"
-        H["O(N log N)\nper iteration"]
-        I["50-200 iterations\ntypical convergence"]
-        J["Kirchhoff plate\nbending stiffness"]
-    end
-
-    style A fill:#2d3142,stroke:#bfc0c0,color:#fff
-    style B fill:#4f5d75,stroke:#bfc0c0,color:#fff
-    style C fill:#4f5d75,stroke:#ef8354,color:#fff
-    style D fill:#4f5d75,stroke:#ef8354,color:#fff
-    style E fill:#4f5d75,stroke:#bfc0c0,color:#fff
-    style F fill:#4f5d75,stroke:#bfc0c0,color:#fff
-    style G fill:#2d3142,stroke:#bfc0c0,color:#fff
-```
-
-### Computational Complexity
-
-| Solver | Complexity | Grid Size | Typical Runtime | Notes |
-|---|---|---|---|---|
-| Feature Extraction | O(N) | Any | <1s | Single-pass rasterization |
-| CMP (EPL + PCHIP) | O(N log N) | Any | <1s | Gaussian convolution via FFT |
-| Contact Mechanics | O(N log N) per iter | 64x64 to 256x256 | 1-30s | 50-200 L-BFGS-B iterations |
-| Thermal FEA (CPU) | O(N^1.5) | Up to 128x128 | 1-10s | Direct sparse solver |
-| Thermal FEA (GPU) | O(N) per CG iter | Up to 512x512 | 0.5-5s | Conjugate gradient on GPU |
-| Monte Carlo Yield | O(N * M) | Any | 1-5s | M=200 MC samples default |
-| DRC Compilation | O(N) | Any | <1s | Threshold comparison |
-
-Total pipeline runtime for a typical 64x64 tile grid (1.6mm x 1.6mm die at 25 um tiles): **5-30 seconds**. This compares to 2-4 weeks for experimental yield learning and 4-8 hours for manual COMSOL thermal + contact analysis of a single configuration.
-
----
-
-## Spectral FFT Contact Solver
-
-The contact mechanics solver is the computational heart of Bondability. It determines whether the post-CMP surface topography allows intimate contact during wafer bonding, or whether gaps remain that become trapped voids.
-
-### The Physics Problem
-
-When two wafers are brought into contact during hybrid bonding, three competing forces determine the equilibrium:
-
-1. **Adhesion** (van der Waals forces) pulls the surfaces together -- favors full contact
-2. **Elastic strain energy** (wafer bending) resists deformation -- favors bridging over topography
-3. **Surface topography** (from CMP non-uniformity) creates the initial gap distribution
-
-The outcome depends on the relative magnitudes:
-
-- **Thick, stiff wafer + weak adhesion + large topography** --> wafer bridges over features, voids form
-- **Thin, flexible wafer + strong adhesion + small topography** --> wafer conforms to surface, full contact
-
-### The Spectral Approach
-
-Direct solution of the contact problem on a 2D grid requires inverting a dense elastic influence matrix -- O(N^2) per iteration, prohibitive for realistic die-sized grids. The spectral approach exploits a key insight: the elastic response kernel is **diagonal in Fourier space**. This transforms the 2D convolution into an element-wise multiplication:
-
-```
-Physical space:  u(x,y) = integral[ K(x-x', y-y') * p(x',y') dx'dy' ]    -- O(N^2)
-Fourier space:   U(kx,ky) = K_hat(kx,ky) * P(kx,ky)                      -- O(N)
-Transform cost:  FFT / IFFT                                                -- O(N log N)
-```
-
-The spectral kernel combines:
-- **Plate bending stiffness:** D * K^4, where D = E*h^3 / (12*(1-nu^2)) is the flexural rigidity
-- **Surface compliance:** E* / (2*dx) for half-space elastic response
-- These are combined in serial compliance for the total system response
-
-### Dugdale Cohesive Zone Adhesion
-
-Adhesion is modeled using the Dugdale cohesive zone model (Maugis 1992):
-
-- Constant traction sigma_max = gamma / dc for gap < dc (cohesive zone width)
-- Zero traction for gap > dc
-- A smoothed Huber-like softplus approximation (alpha=20) provides numerical stability near the transition
-
-This is the standard model in the wafer bonding literature (Turner & Spearing 2002) and is preferred over JKR (which has a square-root singularity) or Morse potentials (which are more expensive to evaluate).
-
-### Energy Minimization
-
-The equilibrium displacement field minimizes the total energy:
-
-```
-E_total = E_elastic(u) + E_adhesion(u) = min!
-```
-
-Solved via L-BFGS-B with box constraints (displacement bounded in [0, gap_max]). Typical convergence in 50-200 iterations at O(N log N) per iteration.
-
-### Mesh Refinement
-
-The Dugdale cohesive zone width (dc = 5 nm) is much smaller than the tile grid resolution (25 um). At tile resolution, the solver produces qualitatively correct results (correct bridging/conforming behavior) but quantitative gap values carry 2-5x error. For production accuracy, mesh refinement subdivides each tile into sub-elements via bilinear interpolation:
-
-| Refine Factor | Effective Resolution | Compute Cost | Gap Accuracy |
-|---|---|---|---|
-| 1 (none) | 25 um | 1x | Qualitative only |
-| 4 | 6.25 um | 16x | Improved |
-| 8 | 3.125 um | 64x | Good |
-| 16 | 1.56 um | 256x | Near-converged |
-
----
-
-## Monte Carlo Yield Engine
-
-### The Yield Problem
-
-Die yield is not a single number -- it is a distribution. Process parameters (overlay, particle contamination, surface roughness) vary from wafer to wafer and lot to lot. A meaningful yield prediction must propagate this uncertainty through the physics chain.
-
-### Monte Carlo Yield Pipeline
-
-```mermaid
-graph TD
-    subgraph "Process Parameter Sampling"
-        P1["Overlay Sigma\nN(20, 3) nm"]
-        P2["Particle Density\nN(0.5, 0.1) /cm2"]
-        P3["Surface Roughness\nN(0.5, 0.1) nm RMS"]
-    end
-
-    subgraph "Per-Trial Physics (x200 trials)"
-        S1["Scale Open-Bond Risk\nby (sigma/ref)^2"]
-        S2["Perturb Gap Map\nwith Gaussian Noise"]
-        S3["Void Risk via Logistic\naround snap-in threshold"]
-        S4["Combine Tile Failures\nP = 1-(1-P_open)(1-P_void)(1-P_delam)"]
-    end
-
-    subgraph "Spatial Yield Model"
-        Y1["Partition into\nCorrelated Clusters"]
-        Y2["Per-Cluster Murphy Yield\nY_k = 1/(1+D_k)"]
-        Y3["Die Yield =\nProduct of Cluster Yields\nx Poisson Particle Kill"]
-    end
-
-    subgraph "Output"
-        O1["Yield Distribution\nP10 / P50 / P90"]
-        O2["Sensitivity Analysis\nElasticity per Parameter"]
-    end
-
-    P1 --> S1
-    P2 --> S2
-    P3 --> S3
-    S1 --> S4
-    S2 --> S4
-    S3 --> S4
-    S4 --> Y1
-    Y1 --> Y2
-    Y2 --> Y3
-    Y3 --> O1
-    Y3 --> O2
-
-    style P1 fill:#264653,stroke:#e9c46a,color:#fff
-    style P2 fill:#264653,stroke:#e9c46a,color:#fff
-    style P3 fill:#264653,stroke:#e9c46a,color:#fff
-    style S4 fill:#2a9d8f,stroke:#e9c46a,color:#fff
-    style Y2 fill:#e76f51,stroke:#e9c46a,color:#fff
-    style O1 fill:#264653,stroke:#f4a261,color:#fff
-```
-
-### Murphy/Stapper Spatial Correlation
-
-The critical insight in semiconductor yield modeling is that defects are **not** spatially independent. A CMP dishing problem at location (x,y) typically means neighboring locations also have dishing problems, because CMP non-uniformity is spatially correlated over the Effective Planarization Length (~100 um).
-
-The Murphy/Stapper model captures this:
-
-1. **Partition the die** into `n_clusters = die_area / correlation_area` independent spatial regions
-2. **Per-cluster defect density** D_k = mean failure probability within cluster k
-3. **Per-cluster yield** Y_k = 1/(1 + D_k) -- the Murphy negative-binomial formula
-4. **Die yield** = product of all cluster yields multiplied by Poisson particle kill contribution
-
-This correctly handles the fact that a high-density defect cluster kills only one region of the die, not the entire die -- unless the cluster happens to contain critical circuitry.
-
-### Sensitivity Analysis
-
-After running 200 Monte Carlo trials, the engine computes quartile-based elasticity for each process parameter:
-
-| Parameter | Typical Elasticity | Interpretation |
-|---|---|---|
-| `correlation_length_um` | **Dominant** (~0.3-0.8) | Uncalibrated -- this single parameter dominates yield by ~100x; use for relative layout comparison, not absolute prediction |
-| `overlay_sigma_nm` | High (~0.2-0.4) | Overlay capability directly impacts open-bond risk |
-| `particle_density_cm2` | Moderate (~0.1-0.3) | Particle contamination affects random yield |
-| `surface_roughness_nm` | Moderate (~0.1-0.2) | Roughness affects snap-in threshold for void closure |
-| `edge_exclusion_tiles` | Low-Moderate (~0.05-0.15) | Edge die yield hit from bonding edge effects |
-
-This analysis identifies which process improvements will have the largest impact on yield, enabling data-driven prioritization of process development efforts.
-
----
-
-## Methodology: Stage-by-Stage Technical Detail
+The pipeline runs six stages sequentially. Each stage consumes outputs
+from prior stages and produces typed dictionaries for downstream stages.
 
 ### Stage 1: Feature Extraction
 
-**Purpose:** Extract spatial features from the layout that drive downstream physics.
-
-**Algorithm:**
-1. Parse GDS/OASIS file using the gdstk library, selecting the specified pad layer and datatype.
-2. Rasterize pad geometries onto a regular tile grid (default 25 um tile size, configurable).
-3. Compute pad density per tile -- the fraction of tile area covered by Cu pads.
-4. Compute density gradient magnitude using central finite differences.
-5. Detect motif patterns using threshold-based heuristics:
-   - **Isolated pads:** tiles with non-zero density but zero-density neighbors (vulnerable to dishing)
-   - **TSV proximity zones:** tiles near known through-silicon via locations
-   - **Extreme gradient regions:** tiles where density changes by more than 0.3 over one tile pitch
-
-**Output:** `FeatureSet` dataclass containing:
-- `density`: H x W pad density map, values in [0, 1]
-- `density_grad`: H x W gradient magnitude map
-- `motif_isolated`, `motif_tsv`, `motif_gradient`: binary motif masks
-- `pad_count`: total number of pads
-- `bbox_um`: die bounding box in microns
-- `tile_um`: tile pitch
+- **Input:** GDS/OASIS file (via gdstk) or pre-computed .npy density array.
+- **Output:** `FeatureSet` dataclass with density map, density gradient,
+  motif masks (isolated pads, TSV proximity, extreme gradient regions),
+  pad count, bounding box.
+- **Tile grid:** Configurable (default 25 um), defines spatial resolution
+  for all downstream solvers.
 
 ### Stage 2: CMP Recess Prediction
 
-**Purpose:** Predict post-CMP surface topography from pad density patterns using the Preston equation framework.
+- **Input:** FeatureSet, CMPConfig.
+- **Physics:** Effective Planarization Length (EPL) kernel convolution of
+  raw density, then PCHIP interpolation from density to recess (nm).
+- **Output:** `eff_density`, `recess_mean_nm`, `recess_sigma_nm`, `gap_nm`,
+  `cmp_margin_index`, and `explain` breakdown (density deficit, gradient
+  magnitude, dominant driver mask).
+- **Calibration:** Default 5-point bathtub curve from Stine et al. 1998.
+  **MUST be replaced with fab-specific data for production use.**
 
-**Physics Basis:** Chemical-mechanical polishing removes material at a rate governed by the Preston equation: removal rate = K_p * P * V, where K_p is the Preston coefficient, P is local pressure, and V is relative velocity. For patterned wafers, local pressure depends on the effective pad density within the planarization length scale. This creates the well-documented "bathtub curve" -- high recess (dishing) at very low density, minimum recess at moderate density (~50%), and increasing recess (erosion) at very high density.
+### Stage 3: Bond Void Risk (Contact Mechanics)
+
+- **Input:** FeatureSet, CMP output, BondingConfig.
+- **Physics:** Spectral FFT contact solver with Dugdale cohesive zone
+  (optional, controlled by `use_physics_solver`). Falls back to heuristic
+  gap-threshold model if disabled.
+- **Output:** `void_risk`, `open_bond_risk`, `gap_nm` (from solver),
+  `explain` (overlay sigma map, risk decomposition).
+
+### Stage 4: Anneal Delamination Risk (Thermal Stress)
+
+- **Input:** FeatureSet, AnnealConfig.
+- **Physics:** CTE mismatch stress (Cu: 17 ppm/K vs. SiO2: 0.5 ppm/K)
+  with optional full thermal FEA. Voigt/Reuss mixing rules for composite
+  modulus. Fracture mechanics interface flaw model.
+- **Output:** `stress_index`, `delam_risk`.
+
+### Stage 5: Monte Carlo Yield Distribution
+
+- **Input:** FeatureSet, CMP output, bonding output, anneal output,
+  YieldModelConfig.
+- **Physics:** Murphy negative-binomial model (Stapper 1983) with spatial
+  correlation via configurable correlation length. Monte Carlo sampling
+  over overlay sigma, particle density, and surface roughness distributions.
+  Edge exclusion zones. Per-cluster yield calculation.
+- **Output:** `samples` (yield array), `summary` (P10/P50/P90/mean),
+  `sensitivity` (elasticity analysis for 5 parameters).
+- **CRITICAL TUNABLE:** `correlation_length_um` (default 500 um) is the
+  single most impactful parameter on yield. Must be calibrated to fab data.
+
+### Stage 6: DRC Rule Compilation
+
+- **Input:** FeatureSet, CMP/bonding/anneal outputs, RulesConfig.
+- **Output:** Violation masks (.npy), rules summary (JSON), suggestions
+  list, KLayout marker database (.lyrdb).
+
+### Stage 7: Report Generation
+
+- **Output:** Self-contained HTML report with embedded base64 images,
+  executive pass/fail verdict, yield metrics, sensitivity tornado chart,
+  risk map gallery, DRC summary, and provenance timestamp.
+
+---
+
+## 4. Complete Directory Tree
+
+```
+PROV_9_BONDABILITY/
+|
+|-- README.md                        # This document
+|-- LICENSE                          # MIT License
+|-- CHANGELOG.md                     # Version history
+|-- Makefile                         # Build/test/lint targets
+|-- pyproject.toml                   # Package metadata, dependencies, tool config
+|-- .pre-commit-config.yaml          # Pre-commit hooks (ruff)
+|-- .gitignore
+|
+|-- bondability/                     # *** PRODUCTION SOURCE CODE ***
+|   |-- __init__.py                  # Package root
+|   |-- cli.py                       # Typer CLI (7 commands)
+|   |-- config.py                    # Pydantic config schemas (7 sections)
+|   |-- pipeline.py                  # End-to-end orchestration
+|   |-- report.py                    # HTML report generator
+|   |-- audit.py                     # Audit trigger logic
+|   |
+|   |-- api/                         # REST API (FastAPI)
+|   |   |-- __init__.py
+|   |   |-- server.py                # FastAPI app, 5 endpoint routes
+|   |   |-- jobs.py                  # Async job store
+|   |   |-- schemas.py               # Pydantic request/response models
+|   |
+|   |-- physics/                     # Physics solvers
+|   |   |-- thermal.py               # CPU thermal FEA (direct sparse)
+|   |   |-- gpu_thermal.py           # GPU thermal FEA (PyTorch CG)
+|   |   |-- gpu_thermal_3d.py        # Multi-layer 3D thermal solver
+|   |   |-- contact.py               # Spectral contact mechanics (Dugdale)
+|   |   |-- plate_gpu.py             # GPU plate bending solver
+|   |   |-- transient.py             # Transient thermal analysis
+|   |   |-- thermal_stress_reconciliation.py  # CPU/GPU solver reconciliation
+|   |   |-- errors.py                # Solver error types
+|   |
+|   |-- cmp/                         # CMP recess prediction
+|   |   |-- __init__.py
+|   |   |-- model.py                 # PCHIP + EPL kernel model
+|   |   |-- calibration.py           # Calibration data management
+|   |   |-- copper_cmp_calibration.py  # Cu-specific CMP calibration
+|   |
+|   |-- bonding/                     # Bond void risk model
+|   |   |-- __init__.py
+|   |   |-- model.py                 # Gap-threshold + physics solver path
+|   |
+|   |-- anneal/                      # Anneal delamination risk
+|   |   |-- __init__.py
+|   |   |-- model.py                 # CTE mismatch + fracture mechanics
+|   |
+|   |-- yield_model/                 # Monte Carlo yield engine
+|   |   |-- __init__.py
+|   |   |-- model.py                 # Murphy/Stapper with spatial correlation
+|   |
+|   |-- features/                    # Density & feature extraction
+|   |   |-- __init__.py
+|   |   |-- extract.py               # FeatureSet from GDS/npy
+|   |   |-- density.py               # Density computation utilities
+|   |
+|   |-- io/                          # GDS/OASIS I/O
+|   |   |-- __init__.py
+|   |   |-- gds.py                   # gdstk-based GDS parser
+|   |   |-- klayout.py               # KLayout marker database export
+|   |
+|   |-- optimize/                    # Inverse design optimizer
+|   |   |-- __init__.py
+|   |   |-- engine.py                # FillOptimizer + SubtractiveOptimizer
+|   |
+|   |-- rules/                       # DRC rule compiler
+|   |   |-- __init__.py
+|   |   |-- compiler.py              # Threshold-based violation detection
+|   |
+|   |-- validation/                  # Benchmarks & fab correlation
+|   |   |-- __init__.py
+|   |   |-- benchmarks.py            # 4 published-data benchmarks
+|   |   |-- fab_correlation.py        # Fab correlation checks
+|   |   |-- multi_node_validation.py  # Multi-node validation
+|   |   |-- production_correlation.py # Production correlation checks
+|   |   |-- scalability_benchmark.py  # Scalability benchmarks
+|   |
+|   |-- verification/                # Buyer verification
+|   |   |-- __init__.py
+|   |   |-- run_buyer_verification.py # Automated verification script
+|   |
+|   |-- ml/                          # Surrogate model (experimental)
+|   |   |-- __init__.py
+|   |   |-- surrogate.py             # ML surrogate model
+|   |   |-- train.py                 # Training pipeline
+|   |
+|   |-- calibration/                  # Calibration tooling
+|   |   |-- __init__.py
+|   |   |-- kla_integration.py       # KLA tool integration
+|   |   |-- synthetic_demo.py        # Synthetic calibration demo
+|   |
+|   |-- cross_pollination/           # Cross-domain extensions
+|   |   |-- __init__.py
+|   |   |-- glass_bonding.py         # Glass bonding model
+|   |   |-- glass_bonding_validation.py  # Glass bonding validation
+|   |
+|   |-- uq/                          # Uncertainty quantification
+|   |   |-- __init__.py
+|   |   |-- montecarlo.py            # MC sampling utilities
+|   |
+|   |-- demo/                        # Synthetic layout generator
+|   |   |-- __init__.py
+|   |   |-- synthetic.py             # SyntheticLayout class
+|   |
+|   |-- viz/                         # Plotting utilities
+|       |-- __init__.py
+|       |-- plots.py                 # Quicklook plot generation
+|
+|-- tests/                           # *** 17 TEST FILES ***
+|   |-- test_smoke.py                # Basic import/instantiation
+|   |-- test_cmp.py                  # CMP model unit tests
+|   |-- test_copper_cmp.py           # Copper CMP calibration tests
+|   |-- test_physics_contact.py      # Contact solver tests
+|   |-- test_bonding_week3.py        # Bond void risk tests
+|   |-- test_anneal_week4.py         # Anneal delamination tests
+|   |-- test_yield_week5.py          # Yield model tests
+|   |-- test_rules_week6.py          # DRC rule compiler tests
+|   |-- test_optimize_week7.py       # Optimizer tests
+|   |-- test_gds_ingestion.py        # GDS I/O tests
+|   |-- test_glass_bonding.py        # Glass bonding cross-pollination tests
+|   |-- test_multi_node.py           # Multi-node validation tests
+|   |-- test_scalability.py          # Scalability benchmark tests
+|   |-- test_cli.py                  # CLI integration tests
+|   |-- test_api.py                  # REST API endpoint tests
+|   |-- test_benchmarks.py           # Validation benchmark tests
+|   |-- test_stress_adversarial.py   # Adversarial stress tests
+|
+|-- configs/                         # *** CONFIGURATION FILES ***
+|   |-- process_example.yaml         # Fully documented example config
+|   |-- process_calibrated.yaml      # Calibrated config variant
+|
+|-- examples/                        # *** EXAMPLE DATA ***
+|   |-- README.md                    # Example usage guide
+|   |-- demo.npy                     # Sample density array
+|
+|-- docs/                            # Documentation directory
+|
+|-- archive/                         # *** HISTORICAL PROOF ARCHIVE ***
+|   |-- runs/                        # Complete pipeline run outputs (6 runs)
+|   |   |-- gds_audit/              # GDS-based audit run
+|   |   |-- gds_w2_audit/           # Week 2 GDS audit run
+|   |   |-- week3_proof/            # Week 3 bonding proof run
+|   |   |-- week4_proof/            # Week 4 anneal proof run
+|   |   |-- week6_proof/            # Week 6 rules proof run
+|   |   |-- proof_pack/             # Final proof package run
+|   |
+|   |-- out_physics_final/           # Physics-validated final output
+|   |-- output/                      # Historical experiment outputs
+|   |   |-- billion_dollar/
+|   |   |-- cli_result/
+|   |   |-- discoveries/
+|   |   |-- e2e_final/
+|   |   |-- e2e_proof/
+|   |   |-- gromacs_adhesion/
+|   |   |-- hero_assets/
+|   |   |-- solver_reconciliation/
+|   |   |-- v9_verification/
+|   |   |-- v10_verification/
+|   |
+|   |-- scripts/                     # 45 historical proof/audit scripts
+|   |-- ml_datasets/                 # ML training data (200 samples)
+|   |-- data/calibration/            # Calibration data files
+|   |-- docs_hype/                   # Historical documentation
+|   |-- *.md                         # Historical audit/valuation reports
+|   |-- *.log                        # Verification logs
+|   |-- *.json                       # Verification reports
+```
+
+---
+
+## 5. Complete Python File Inventory
+
+### Production Source (bondability/)
+
+| File | Purpose | Key Functions/Classes |
+|------|---------|----------------------|
+| `__init__.py` | Package root | Version string |
+| `cli.py` | Typer CLI with 7 commands | `run`, `optimize`, `analyze`, `benchmark`, `correlate`, `config show`, `config validate`, `serve` |
+| `config.py` | Pydantic v2 configuration schemas | `AppConfig`, `CMPConfig`, `BondingConfig`, `AnnealConfig`, `YieldModelConfig`, `RulesConfig`, `OptimizeConfig`, `ProcessConfig` |
+| `pipeline.py` | End-to-end orchestration | `run_pipeline()`, `load_config()`, `validate_pipeline_inputs()` |
+| `report.py` | Self-contained HTML report | `generate_html_report()` |
+| `audit.py` | Audit trigger logic | `check_audit_triggers()`, `save_audit_requests()` |
+| `api/server.py` | FastAPI application | 5 endpoint handlers, background task runners |
+| `api/jobs.py` | In-memory async job store | `JobStore` class |
+| `api/schemas.py` | Pydantic request/response models | `SimulationRequest`, `OptimizationRequest`, `ConfigValidateRequest`, `JobStatus`, `HealthResponse` |
+| `physics/thermal.py` | CPU thermal FEA (direct sparse solver) | `solve_thermal_stress()`, `validate_against_suhir()`, `MaterialProps`, `COPPER`, `SILICON_DIOXIDE`, `SILICON` |
+| `physics/gpu_thermal.py` | GPU thermal FEA (PyTorch CG) | `GPUThermalSolver` class |
+| `physics/gpu_thermal_3d.py` | Multi-layer 3D thermal solver | `MultiLayerThermalSolver` class |
+| `physics/contact.py` | Spectral contact mechanics | `solve_contact_mechanics()` (FFT + Dugdale) |
+| `physics/plate_gpu.py` | GPU plate bending solver | GPU-accelerated plate mechanics |
+| `physics/transient.py` | Transient thermal analysis | Time-stepping thermal solver |
+| `physics/errors.py` | Solver error hierarchy | `SolverError` exception class |
+| `cmp/model.py` | CMP recess predictor | `predict_cmp_recess()`, `cmp_sanity_sweep()`, PCHIP interpolator |
+| `cmp/calibration.py` | CMP calibration data | Calibration management utilities |
+| `bonding/model.py` | Bond void risk model | `predict_bond_void_risk()` |
+| `anneal/model.py` | Anneal delamination model | `predict_anneal_delam_risk()` |
+| `yield_model/model.py` | Monte Carlo yield engine | `predict_yield_distribution()` |
+| `features/extract.py` | Feature extraction | `extract_features()`, `FeatureSet` dataclass |
+| `features/density.py` | Density computation | Density map utilities |
+| `io/gds.py` | GDS/OASIS parser | gdstk-based layout ingestion |
+| `io/klayout.py` | KLayout export | `write_rdb()` for .lyrdb marker database |
+| `optimize/engine.py` | Inverse design optimizer | `FillOptimizer`, `SubtractiveOptimizer` |
+| `rules/compiler.py` | DRC rule compiler | `compile_rules()` |
+| `validation/benchmarks.py` | Published-data benchmarks | `run_all_benchmarks()`, 4 benchmark functions |
+| `validation/fab_correlation.py` | Fab correlation checks | `run_all_correlations()` |
+| `verification/run_buyer_verification.py` | Automated buyer verification | End-to-end verification script |
+| `ml/surrogate.py` | ML surrogate model | Surrogate model for fast inference |
+| `ml/train.py` | ML training pipeline | Training loop and data loading |
+| `uq/montecarlo.py` | MC sampling utilities | Uncertainty quantification helpers |
+| `demo/synthetic.py` | Synthetic layout generator | `SyntheticLayout` class |
+| `viz/plots.py` | Quicklook plot generation | `plot_quicklook()` |
+
+### Test Files (tests/)
+
+| File | Coverage Area | Key Assertions |
+|------|---------------|----------------|
+| `test_smoke.py` | Basic imports, config instantiation | Modules load, defaults valid |
+| `test_cmp.py` | CMP model correctness | Bathtub shape, PCHIP monotonicity, recess bounds |
+| `test_physics_contact.py` | Spectral contact solver | Convergence, bridging/conforming ordering |
+| `test_bonding_week3.py` | Bond void risk pipeline | Risk bounds [0,1], motif penalty |
+| `test_anneal_week4.py` | Anneal delamination pipeline | Stress index, CTE mismatch |
+| `test_yield_week5.py` | Monte Carlo yield engine | Yield in [0,1], sensitivity monotonicity |
+| `test_rules_week6.py` | DRC rule compiler | Violation masks, threshold behavior |
+| `test_optimize_week7.py` | Fill optimizer | Yield improvement, fill budget |
+| `test_gds_ingestion.py` | GDS I/O via gdstk | Layout parsing, density extraction |
+| `test_cli.py` | CLI integration | Command execution, output file creation |
+| `test_api.py` | REST API endpoints | HTTP status codes, response schemas |
+| `test_benchmarks.py` | Validation benchmarks | All 4 benchmarks pass |
+| `test_copper_cmp.py` | Copper CMP calibration | Cu recess curves, Preston equation, calibration pipeline |
+| `test_glass_bonding.py` | Glass bonding cross-pollination | AGC/Corning/Schott properties, bond energy, yield prediction |
+| `test_multi_node.py` | Multi-node validation | Distributed pipeline, cross-node consistency checks |
+| `test_scalability.py` | Scalability benchmarks | Large-grid performance, memory usage, wall-time |
+| `test_stress_adversarial.py` | Adversarial stress tests | Edge cases, extreme densities, NaN handling |
+
+### Archive Scripts (archive/scripts/) -- 45 Historical Proof Scripts
+
+These scripts are NOT part of the production pipeline. They are historical
+proof-of-concept, audit, and validation scripts retained for provenance.
+
+| File | Purpose |
+|------|---------|
+| `_audit_checker.py` | Internal audit validation |
+| `active_learning_loop.py` | Active learning exploration |
+| `attack_optimizer.py` | Adversarial optimizer testing |
+| `check_dataset_stats.py` | ML dataset statistics |
+| `debug_physics_v4.py` | Physics debugging (v4) |
+| `deep_audit_all.py` | Comprehensive audit runner |
+| `deep_proof.py` | Deep validation proof |
+| `deep_sensitivity.py` | Sensitivity analysis |
+| `demo_surrogate.py` | Surrogate model demo |
+| `discover_design_rules.py` | Design rule discovery |
+| `discovery_engine.py` | Automated discovery |
+| `discovery_sweeps.py` | Parameter sweep discovery |
+| `discovery_sweeps_345.py` | Extended parameter sweeps |
+| `e2e_platform_proof.py` | End-to-end platform proof |
+| `fidelity_audit.py` | Solver fidelity audit |
+| `generate_billion_dollar_proof.py` | Value proof generation |
+| `generate_hero_assets.py` | Showcase asset generation |
+| `generate_ml_dataset.py` | ML training data generation |
+| `generate_patent_fill.py` | Patent figure generation |
+| `grid_convergence_proof.py` | Mesh convergence study |
+| `gromacs_cu_adhesion.py` | GROMACS Cu adhesion simulation |
+| `hyper_optimize.py` | Hyperparameter optimization |
+| `mega_proof.py` | Comprehensive proof runner |
+| `parameter_sweep_proof.py` | Parameter sweep proof |
+| `physics_audit_final.py` | Final physics audit |
+| `reconcile_solvers.py` | CPU/GPU solver reconciliation |
+| `reliability_compiler.py` | Reliability analysis |
+| `scaling_audit.py` | Performance scaling audit |
+| `simulate_floorplan.py` | Floorplan simulation |
+| `simulate_moats.py` | Moat structure simulation |
+| `solver_consensus_proof.py` | Solver agreement proof |
+| `stress_test_ip.py` | IP stress testing |
+| `ultimate_coupling.py` | Multi-physics coupling test |
+| `verify_3d_stack.py` | 3D stack verification |
+| `verify_breakpoint.py` | Breakpoint verification |
+| `verify_claims.py` | Claims verification (v1) |
+| `verify_claims_v2.py` | Claims verification (v2) |
+| `verify_full_reticle.py` | Full-reticle verification |
+| `verify_gpu_pipeline.py` | GPU pipeline verification |
+| `verify_grid_convergence.py` | Grid convergence verification |
+| `verify_post_audit.py` | Post-audit verification |
+| `verify_robustness_monte_carlo.py` | Monte Carlo robustness |
+| `verify_v10_proof.py` | Version 10 proof |
+| `verify_v11_physics.py` | Version 11 physics proof |
+| `visualize_physics_deep_dive.py` | Physics visualization |
+
+---
+
+## 6. Output Files Inventory
+
+### Pipeline Run Outputs
+
+Each pipeline run (`bondability run`) produces the following directory
+structure in the output directory:
+
+```
+results/
+|-- report.html                       # Self-contained HTML signoff report
+|-- yield_summary.json                # Yield P10/P50/P90/mean, MC params
+|-- features_report.json              # Feature extraction summary
+|-- rules_summary.json                # DRC violation summary
+|-- suggestions.json                  # Actionable design suggestions
+|-- audit_request.json                # Audit trigger flags
+|-- optimization_report.json          # (if --optimize) Optimizer report
+|-- pipeline_timing.json              # Per-stage timing breakdown
+|-- markers.lyrdb                     # KLayout marker database (DRC)
+|
+|-- risk_maps/                        # Numpy arrays (.npy)
+|   |-- density.npy                   # Raw pad density [H, W]
+|   |-- density_grad.npy              # Density gradient magnitude
+|   |-- eff_density.npy               # CMP effective density (EPL-smoothed)
+|   |-- recess_mean_nm.npy            # CMP recess prediction (nm)
+|   |-- recess_sigma_nm.npy           # CMP recess variation (nm)
+|   |-- gap_nm.npy                    # Contact gap (nm)
+|   |-- cmp_margin_index.npy          # CMP margin index [0=healthy, 1=critical]
+|   |-- void_risk.npy                 # Bond void risk [0, 1]
+|   |-- open_bond_risk.npy            # Overlay open-bond risk [0, 1]
+|   |-- stress_index.npy              # Thermal stress index
+|   |-- delam_risk.npy                # Delamination risk [0, 1]
+|   |-- motif_*.npy                   # Motif detection masks
+|   |-- cmp_explain/                  # CMP explainability
+|       |-- density_deficit.npy       # Distance from 50% optimum density
+|       |-- density_driven_mask.npy   # Dominant risk factor mask
+|       |-- density_gradient_mag.npy  # Local gradient magnitude
+|
+|-- violations/                       # DRC violation masks (.npy)
+|   |-- low_density.npy               # Below min density threshold
+|   |-- high_density.npy              # Above max density threshold
+|   |-- density_gradient.npy          # Exceeds max gradient
+|   |-- void_hotspots.npy             # Void risk above threshold
+|   |-- delam_hotspots.npy            # Delamination risk above threshold
+|   |-- margin_critical.npy           # CMP margin critical zones
+|
+|-- plots/                            # PNG visualizations
+    |-- density.png                   # Pad density heatmap
+    |-- eff_density.png               # CMP effective density heatmap
+    |-- recess_mean_nm.png            # CMP recess heatmap
+    |-- void_risk.png                 # Void risk heatmap
+    |-- delam_risk.png                # Delamination risk heatmap
+    |-- open_bond_risk.png            # Open bond risk heatmap
+    |-- stress_index.png              # Thermal stress heatmap
+    |-- yield_histogram.png           # Monte Carlo yield distribution
+    |-- sensitivity_tornado.png       # Parameter sensitivity tornado
+    |-- cmp_margin.png                # CMP margin index heatmap
+    |-- density_gradient.png          # Density gradient heatmap
+```
+
+### Archived Run Outputs (archive/runs/)
+
+Six complete pipeline runs are preserved for provenance:
+
+| Run Directory | Content | Status |
+|--------------|---------|--------|
+| `gds_audit/` | GDS-ingested audit run | Complete (risk maps, plots, violations, JSON) |
+| `gds_w2_audit/` | Week 2 GDS audit run | Complete (with CMP explain maps) |
+| `week3_proof/` | Week 3 bonding proof | Complete (contact mechanics validated) |
+| `week4_proof/` | Week 4 anneal proof | Complete (thermal stress validated) |
+| `week6_proof/` | Week 6 rules proof | Complete (DRC compilation validated) |
+| `proof_pack/` | Final integrated proof | Complete (all stages, optimization report) |
+
+Each archived run contains the full output structure: risk_maps/, plots/,
+violations/, JSON summaries, and (where applicable) HTML reports and
+KLayout markers.
+
+### Archived Physics-Final Output (archive/out_physics_final/)
+
+Complete physics-validated output with optimization report, including
+all risk maps, CMP explainability arrays, violation masks, plots, and
+HTML signoff report.
+
+---
+
+## 7. CLI Reference
+
+The CLI is built with Typer and Rich. Entry point: `bondability`.
+
+### `bondability run`
+
+Run the full bondability pipeline on a layout.
+
+```
+Options:
+  -i, --input PATH        Input .npy density or .gds/.oas layout file [required]
+  -c, --config PATH       Process config YAML (optional, uses defaults)
+  -o, --output PATH       Output directory [default: results]
+  -l, --layer INT         GDS pad layer (required for .gds input)
+  --datatype INT          GDS pad datatype [default: 0]
+  --tile-um FLOAT         Tile size in microns [default: 25.0]
+  --optimize              Enable fill optimization
+  -v, --verbose           Verbose logging
+```
+
+Stages executed: Feature extraction -> CMP -> Bonding -> Anneal -> Yield -> Rules -> Save + Report.
+
+### `bondability optimize`
+
+Run fill optimization on a density map (standalone, not part of full pipeline).
+
+```
+Options:
+  -i, --input PATH        Input .npy density file [required]
+  -o, --output PATH       Output directory [default: result]
+  -m, --method TEXT       "additive" or "subtractive" [default: subtractive]
+  -n, --iterations INT    Max iterations [default: 30]
+  --restarts INT          Multi-start restarts [default: 5]
+  --no-gpu                Disable GPU thermal in optimization loop
+  --prefill / --no-prefill  Apply checker prefill [default: True]
+  -v, --verbose           Verbose logging
+```
+
+Outputs: `optimized_layout.npy`, `report.json` with yield, void risk,
+delam risk, GPU peak stress, and elapsed time.
+
+### `bondability analyze`
+
+Thermal stress analysis (2D single-layer or 3D multi-layer).
+
+```
+Options:
+  -i, --input PATH        Input .npy density file [required]
+  --layers INT            Number of layers [default: 1]
+  --layer-files TEXT      Per-layer .npy file paths (optional)
+  --compare-smooth        Compare sharp vs. smoothed interface
+  -v, --verbose           Verbose logging
+```
+
+For `--layers 1`: uses 2D GPU thermal solver.
+For `--layers > 1`: uses MultiLayerThermalSolver with via stress analysis.
+
+### `bondability benchmark`
+
+Run self-validation benchmarks against published data. Exits with code 1
+if any benchmark fails.
+
+```
+Options:
+  -v, --verbose           Verbose logging
+```
+
+Runs 4 benchmarks: CMP Stine 1998 (hold-out), Contact Turner 2002,
+Thermal Suhir 1986, Yield sanity + seed configurability.
+
+### `bondability correlate`
+
+Run fab correlation checks against published literature.
+
+```
+Options:
+  -o, --output PATH       Output directory [default: output]
+  -v, --verbose           Verbose logging
+```
+
+Outputs: `fab_correlation_report.json`.
+
+### `bondability config show`
+
+Print the default configuration as JSON to stdout.
+
+### `bondability config validate <path>`
+
+Validate a process configuration YAML file against the Pydantic schema.
+Reports process name, CMP EPL, anneal temperature, and MC sample count.
+
+### `bondability serve`
+
+Start the REST API server (requires `bondability-d2w[api]`).
+
+```
+Options:
+  --host TEXT             Bind address [default: 127.0.0.1]
+  -p, --port INT          Port [default: 8000]
+  -w, --workers INT       Uvicorn workers [default: 1]
+  --reload                Auto-reload on code changes
+```
+
+---
+
+## 8. REST API Reference
+
+Start with `bondability serve`. Interactive Swagger docs at `/docs`.
+
+### POST /api/v1/simulate
+
+Submit a simulation job (asynchronous).
+
+**Request body:**
+```json
+{
+  "density": [[0.3, 0.5, ...], [0.4, 0.6, ...]],
+  "tile_um": 25.0,
+  "config_overrides": {"cmp": {"epl_um": 80}}
+}
+```
+
+**Response:** `JobStatus` with `job_id` and `state: "pending"`.
+
+**Background:** Runs full pipeline (CMP -> bonding -> anneal -> yield -> rules).
+
+### GET /api/v1/simulate/{job_id}
+
+Poll job status. Returns `JobStatus` with `state` ("pending", "running",
+"completed", "failed"), `progress` string, and `result` dict on completion.
+
+**Result payload on completion:**
+```json
+{
+  "yield_summary": {"yield_p10": 0.85, "yield_p50": 0.91, ...},
+  "rules_summary": {"hot_void_frac": 0.02, ...},
+  "suggestions": [...],
+  "grid_size": [64, 64]
+}
+```
+
+### POST /api/v1/optimize
+
+Submit an optimization job (asynchronous).
+
+**Request body:**
+```json
+{
+  "density": [[...]],
+  "tile_um": 25.0,
+  "method": "subtractive",
+  "iterations": 15,
+  "config_overrides": {}
+}
+```
+
+### GET /api/v1/optimize/{job_id}
+
+Poll optimization job status. Result includes `yield_summary`,
+`optimized_density_mean`, `void_risk_mean`, `delam_risk_mean`, `method`.
+
+### POST /api/v1/validate
+
+Validate a configuration dictionary against the Pydantic schema.
+
+**Request body:**
+```json
+{
+  "config": {"cmp": {"epl_um": 80}, "anneal": {"anneal_temp_C": 350}}
+}
+```
+
+**Response:**
+```json
+{"valid": true, "effective_config": {...}}
+```
+
+### GET /api/v1/health
+
+Health check. Returns solver availability (GPU thermal, GDS parser) and
+GPU device type.
+
+### GET /api/v1/benchmarks
+
+Run all validation benchmarks and return the full report JSON.
+
+---
+
+## 9. Python API Reference
+
+### Primary Entry Point: `run_pipeline()`
+
+```python
+from bondability.pipeline import run_pipeline
+from pathlib import Path
+
+result = run_pipeline(
+    gds_path=Path("design.gds"),      # GDS/OAS file (or None for synthetic)
+    process_yaml=Path("config.yaml"),  # Process configuration
+    out_dir=Path("results/"),          # Output directory
+    pad_layer=10,                      # GDS layer for pads
+    pad_datatype=0,                    # GDS datatype for pads
+    tile_um=25.0,                      # Tile resolution (microns)
+    layout_override=None,              # Optional SyntheticLayout
+    optimize=False,                    # Enable fill optimization
+    dry_run=False,                     # Validate without solving
+)
+
+# result keys: "features", "yield_summary", "rules_summary", "timings"
+# If errors occurred: result["errors"] lists them
+```
+
+### Individual Solver APIs
+
+```python
+# CMP
+from bondability.cmp.model import predict_cmp_recess, cmp_sanity_sweep
+cmp_out = predict_cmp_recess(features, cmp_config)
+
+# Contact mechanics
+from bondability.physics.contact import solve_contact_mechanics
+result = solve_contact_mechanics(
+    topology_nm, pixel_size_um=25.0, modulus_gpa=130.0,
+    thickness_um=775.0, adhesion_energy_j_m2=0.5,
+    adhesion_range_nm=5.0, refine_factor=4,
+)
+
+# Thermal stress (CPU)
+from bondability.physics.thermal import solve_thermal_stress
+result = solve_thermal_stress(
+    density, tile_um=25.0, delta_T_K=275.0,
+    boundary="free", smooth_interface=False,
+)
+
+# Thermal stress (GPU)
+from bondability.physics.gpu_thermal import GPUThermalSolver
+solver = GPUThermalSolver()
+result = solver.solve(density, tile_um=25.0, delta_T_K=275.0)
+
+# Yield
+from bondability.yield_model.model import predict_yield_distribution
+yield_out = predict_yield_distribution(features, cmp_out, bonding_out, anneal_out, yield_config)
+
+# Optimizer
+from bondability.optimize.engine import FillOptimizer, SubtractiveOptimizer
+optimizer = FillOptimizer(app_config)
+opt_features, report = optimizer.optimize(features)
+```
+
+### Configuration API
+
+```python
+from bondability.config import AppConfig
+from bondability.pipeline import load_config
+
+# Load from YAML
+cfg = load_config(Path("configs/process_example.yaml"))
+
+# Create with defaults
+cfg = AppConfig()
+
+# Access sections
+cfg.cmp.epl_um          # 100.0
+cfg.bonding.gap_nm_threshold  # 12.0
+cfg.yield_model.correlation_length_um  # 500.0
+
+# Serialize
+json_str = cfg.model_dump_json(indent=2)
+```
+
+---
+
+## 10. Physics Solvers Detail
+
+### 10.1 CMP Solver: PCHIP Interpolation with EPL Kernel
+
+**File:** `bondability/cmp/model.py`
 
 **Algorithm:**
-1. Convolve raw pad density with a Gaussian kernel whose sigma is derived from the Effective Planarization Length (EPL, default 100 um). The EPL represents the spatial averaging scale of the CMP pad.
-2. Map effective density to recess (nm) via PCHIP interpolation (Piecewise Cubic Hermite Interpolating Polynomial). PCHIP preserves monotonicity on each segment and avoids Runge-type overshoot -- critical for physical sanity.
-3. Compute density-dependent recess sigma: `sigma(d) = base_sigma * (1 + scale * (1 - d))`. Higher variation at low density where isolated features are sensitive to local process variation.
+1. Compute effective density by convolving raw pad density with a Gaussian
+   kernel whose sigma is derived from the Effective Planarization Length
+   (EPL, default 100 um). The EPL represents the pad-scale averaging
+   behavior of CMP. Supports optional anisotropic kernels.
+2. Map effective density to recess (nm) via PCHIP (Piecewise Cubic Hermite
+   Interpolating Polynomial) interpolation. PCHIP preserves monotonicity
+   and avoids overshoot -- critical for physical sanity.
+3. Compute density-dependent recess sigma:
+   `sigma(d) = base_sigma * (1 + scale * (1 - d))`.
+   Higher variation at low density (isolated features).
 4. Derive gap proxy: `gap_nm = recess_mean + surface_roughness`.
 5. Compute CMP margin index: `gap / gap_threshold`, clipped to [0, 1].
 
-**Calibration Data (Copper CMP default, from Ouma et al. 2002):**
+**Calibration Data:**
+Default 5-point bathtub curve from Stine et al. 1998:
+- d=0.0 -> 25 nm (high dishing at very low density)
+- d=0.3 -> 10 nm
+- d=0.5 -> 5 nm (minimum recess near optimal density)
+- d=0.7 -> 8 nm (erosion begins)
+- d=1.0 -> 20 nm (significant erosion at very high density)
 
-| Pattern Density | Cu Recess (nm) | Physical Mechanism |
-|---|---|---|
-| 0% (bare dielectric) | 40 nm | Severe Cu dishing -- no load sharing |
-| 30% | 20 nm | Significant dishing -- sparse features |
-| 50% (optimal) | 8 nm | Minimum recess -- balanced pressure |
-| 70% | 15 nm | Erosion onset -- dielectric thinning |
-| 100% (solid Cu) | 35 nm | Significant erosion -- pad glazing |
+**Note:** The default is now the `copper_hybrid_bonding` preset (Enquist 2019,
+Kim 2022). The original Stine 1998 aluminum curve is available as fallback.
+For production use, replace with fab-specific measurements via the calibration
+module or manual YAML editing.
 
-**Also includes legacy aluminum CMP calibration (Stine et al. 1998):**
+**Reference:** Stine et al., "Rapid Characterization and Modeling of
+Pattern-Dependent Variation in CMP", IEEE TSM, 1998.
 
-| Pattern Density | Al Recess (nm) | Physical Mechanism |
-|---|---|---|
-| 0% | 25 nm | Al dishing (lower than Cu -- harder material) |
-| 30% | 10 nm | Moderate dishing |
-| 50% (optimal) | 5 nm | Minimum recess |
-| 70% | 8 nm | Erosion onset |
-| 100% | 20 nm | Significant erosion |
+### 10.2 Contact Solver: Spectral FFT with Dugdale Cohesive Zone
 
-**Important:** The default now uses the copper_hybrid_bonding preset (Enquist 2019, Kim 2022), but users MUST replace with fab-specific Cu CMP measurements for production use. The calibration module supports loading custom fab data via YAML configuration or programmatic API.
-
-### Stage 3: Contact Mechanics (Spectral FFT Solver)
-
-**Purpose:** Determine whether post-CMP topography allows intimate contact during bonding.
-
-**Physics Basis:** The bonding problem is formulated as energy minimization. The total energy is the sum of elastic strain energy (from wafer bending to conform to the surface) and adhesion energy (from van der Waals attraction at the bond interface). The equilibrium displacement field minimizes this total energy.
+**File:** `bondability/physics/contact.py`
 
 **Algorithm:**
-1. Optionally refine the tile grid to sub-um elements via bilinear interpolation (configurable `refine_factor`).
-2. Nondimensionalize all quantities using characteristic pressure (sigma_max) and characteristic length (dc) for O(1) numerical conditioning.
-3. Build the spectral elastic kernel in Fourier space: plate bending stiffness (D * K^4) and surface compliance (E* / (2*dx)) in serial compliance. This kernel is diagonal in Fourier space.
-4. Model adhesion using the Dugdale cohesive zone: constant traction sigma_max = gamma/dc for gap < dc, zero for gap > dc. A smoothed Huber-like softplus approximation (alpha=20) provides near-step behavior with numerical stability.
-5. Minimize total energy using L-BFGS-B with box constraints (displacement in [0, gap_max]).
-6. Convert back to physical units (nm). Block-average to tile resolution if mesh was refined.
+1. Optional mesh refinement: subdivide tiles into sub-um elements
+   (bilinear interpolation, configurable refine_factor).
+2. Nondimensionalize all quantities (characteristic pressure = sigma_max,
+   characteristic length = dc).
+3. Build spectral kernel combining plate bending stiffness (D * K^4) and
+   surface compliance (E*/(2*dx)), in serial compliance.
+4. Formulate energy functional: elastic energy (spectral) + Dugdale
+   adhesion energy (smoothed piecewise-linear with Huber-like softplus
+   approximation, alpha=20 for near-step behavior).
+5. Solve with L-BFGS-B (box constraints: displacement in [0, gap] for
+   peaks, zero for valleys).
+6. Convert back to physical units (nm). Block-average to tile resolution
+   if mesh was refined.
 
-**Key Parameters:**
+**Physics basis:**
+- Kirchhoff plate bending: `D = E*h^3 / (12*(1-nu^2))` for flexural
+  rigidity of the wafer.
+- Dugdale cohesive zone: constant traction `sigma_max = gamma/dc` for
+  gap < dc, zero for gap > dc. Standard Maugis-Dugdale model.
+- Spectral method: O(N log N) via FFT. The kernel in Fourier space
+  decouples the 2D problem into independent modes.
 
-| Parameter | Default | Physical Meaning |
-|---|---|---|
-| `modulus_gpa` | 130 (Si) | Wafer material stiffness |
-| `thickness_um` | 775 | Standard 300mm wafer thickness |
-| `adhesion_energy_j_m2` | 0.5 | Surface energy for SiO2-SiO2 bonding |
-| `adhesion_range_nm` | 5.0 | Dugdale cohesive zone width (dc) |
-| `poisson_ratio` | 0.28 | Si Poisson ratio |
+**Complexity:** O(N log N) per L-BFGS-B iteration, where N = H*W (or
+refined H*W*rf^2). Typical convergence in 50-200 iterations.
 
-### Stage 4: Thermal Stress Analysis
+**HONEST LIMITATION:** At tile resolution (25 um), the Dugdale cohesive
+zone (dc=5 nm) is severely under-resolved. The solver warns about this.
+Use refine_factor >= 4 for production accuracy (16x slower). Qualitative
+ordering (thick bridges, thin conforms) is correct at any resolution.
 
-**Purpose:** Compute CTE-mismatch-driven stress during post-bond annealing and assess delamination risk.
+**Reference:** Turner & Spearing, "Modeling of Direct Wafer Bonding",
+J. Appl. Phys., 2002.
 
-**Physics Basis:** Copper (CTE = 17 ppm/K) and silicon dioxide (CTE = 0.5 ppm/K) expand at very different rates during the 200-400C anneal used to strengthen hybrid bonds. This 16.5 ppm/K CTE mismatch creates stress at material interfaces. If the elastic strain energy release rate exceeds the interface fracture toughness (~1-5 J/m^2 for Cu-SiO2), delamination occurs.
+### 10.3 Thermal Solver: 2D Plane-Stress FEA
 
-**Algorithm (CPU variant -- direct sparse solver):**
-1. Assign composite material properties per tile using Voigt rule-of-mixtures: density=1 maps to pure Cu, density=0 maps to pure SiO2, intermediate densities are linearly mixed.
-2. Compute plane-stress stiffness matrix elements: C11 = E/(1-nu^2), C12 = nu*E/(1-nu^2), C66 = E/(2*(1+nu)).
-3. Compute thermal strain: eps_th = CTE * delta_T (where delta_T = anneal_temp - room_temp, typically 275K).
-4. Assemble sparse linear system (2 DOFs per node: u, v displacements) using central finite differences.
-5. Direct solve via `scipy.sparse.linalg.spsolve` -- guaranteed convergence.
-6. Compute von Mises equivalent stress from the stress tensor.
-7. Assess delamination risk using Griffith fracture mechanics: G = sigma^2 * a / E' where a is the interface flaw size.
+**Files:** `bondability/physics/thermal.py` (CPU), `bondability/physics/gpu_thermal.py` (GPU)
 
-**Algorithm (GPU variant -- PyTorch conjugate gradient):**
-- Same physics as CPU, implemented in PyTorch tensors.
-- Conjugate gradient solver with configurable max_iter and tolerance.
-- Supports MPS (Apple Silicon), CUDA, and CPU fallback.
-- 3D multi-layer variant available for stacked die configurations.
+**CPU Variant (Direct Sparse Solver):**
+1. Assign material properties per tile via Voigt rule-of-mixtures:
+   density=1 -> Cu, density=0 -> SiO2. Computes E, nu, CTE fields.
+2. Compute plane-stress stiffness: C11 = E/(1-nu^2), C12 = nu*E/(1-nu^2),
+   C66 = E/(2*(1+nu)).
+3. Thermal strain: eps_th = CTE * delta_T.
+4. Assemble sparse linear system (2 DOFs per node: u, v) using central
+   finite differences for equilibrium equations.
+5. Direct solve via `scipy.sparse.linalg.spsolve` -- guaranteed
+   convergence, no iteration count worries.
+6. Extract displacement fields, compute strain and stress from displacements,
+   compute von Mises equivalent stress.
+7. Optional smooth_interface: 1-tile Gaussian smoothing of density at
+   material interfaces eliminates the sharp-interface FD stress singularity.
 
-**Material Properties:**
+**GPU Variant (PyTorch Conjugate Gradient):**
+1. Same physics as CPU but implemented in PyTorch tensors.
+2. Conjugate gradient solver with configurable max_iter and tolerance.
+3. Supports MPS (Apple Silicon), CUDA, and CPU fallback.
+4. Boundary options: "free" (natural BCs) or "clamped" (zero displacement).
 
-| Property | Copper (Cu) | Silicon Dioxide (SiO2) | Silicon (Si) |
-|---|---|---|---|
-| Young's modulus (GPa) | 130 | 70 | 170 |
-| Poisson ratio | 0.34 | 0.17 | 0.28 |
-| CTE (ppm/K) | 17.0 | 0.5 | 2.6 |
-| Yield strength (MPa) | ~300 (at temp) | N/A (brittle) | N/A |
+**3D Multi-Layer Variant:** `gpu_thermal_3d.py` extends to multiple bonded
+layers with inter-layer via stress analysis.
 
-### Stage 5: Monte Carlo Yield Prediction
+**Key difference between CPU and GPU:** CPU defaults to free BCs, GPU
+defaults to free BCs (configurable). Clamped BCs model a die constrained
+by surrounding wafer material. Free BCs model an isolated die. Different
+BCs produce different stress distributions; ensure matching when comparing.
 
-**Purpose:** Propagate process uncertainty through the physics chain to produce yield distributions.
+**HONEST LIMITATION:** Linear elastic only. No plasticity. At 300C anneal,
+peak von Mises stress at sharp Cu/SiO2 interfaces can exceed Cu yield
+(~300 MPa). In reality, Cu yields and stress redistributes. Implementing
+proper incremental plasticity would require load stepping, tangent stiffness
+updates, and deviatoric radial return. The solver reports honest elastic
+stress and documents this limitation.
+
+**Reference:** Suhir, "Stresses in Bi-Metal Thermostats", J. Appl. Mech.,
+1986.
+
+### 10.4 Yield Engine: Murphy/Stapper with Monte Carlo
+
+**File:** `bondability/yield_model/model.py`
 
 **Algorithm:**
-1. For each of 200 Monte Carlo trials (configurable):
-   a. Sample overlay sigma from Normal(20, 3) nm, clipped to >= 5 nm
-   b. Sample particle density from Normal(0.5, 0.1) defects/cm^2
-   c. Sample surface roughness from Normal(0.5, 0.1) nm RMS
-   d. Scale open-bond risk by (sampled_sigma / reference_sigma)^2
-   e. Perturb gap map with Gaussian noise (sigma = sampled roughness)
-   f. Compute void risk via logistic around snap-in threshold (~9 nm)
-   g. Combine per-tile failure: P_fail = 1 - (1 - P_open)(1 - P_void)(1 - P_delam)
-   h. Apply edge exclusion (default 2 tiles per edge)
-   i. Partition die interior into spatial clusters: n = H*W / corr_tiles^2
-   j. Per-cluster Murphy yield: Y_k = 1/(1 + D_k)
-   k. Die yield = product of cluster yields times Poisson particle kill
-2. Compute summary statistics: P10, P50 (median), P90, mean
-3. Run sensitivity analysis: quartile-based elasticity for 5 parameters
+1. Sample global process parameters (N Monte Carlo trials):
+   - Overlay sigma: Normal(mu=20, sigma=3) nm, clipped to >= 5
+   - Particle density: Normal(mu=0.5, sigma=0.1) defects/cm2
+   - Surface roughness: Normal(mu=0.5, sigma=0.1) nm RMS
+2. For each trial:
+   a. Scale open-bond risk by (sampled_sigma / reference_sigma)^2.
+   b. Perturb gap map with Gaussian noise (sigma = sampled roughness).
+   c. Compute void risk via logistic around snap-in threshold (~9 nm).
+   d. Combine per-tile failure: P_fail = 1 - (1-P_open)(1-P_void)(1-P_delam).
+   e. Apply edge exclusion (default 2 tiles per edge).
+   f. Partition interior into spatial clusters (n = H*W / corr_tiles^2).
+   g. Per-cluster Murphy yield: Y_k = 1/(1+D_k) where D_k = mean risk.
+   h. Die yield = product of cluster yields * Poisson particle yield.
+3. Compute summary statistics: P10, P50, P90, mean yield.
+4. Sensitivity analysis: quartile-based elasticity for overlay, particles,
+   roughness, plus structural parameters (correlation length, edge exclusion).
 
-### Stage 6: DRC Rule Compilation and Inverse Design
+**CRITICAL TUNABLE:** `correlation_length_um` (default 500 um). This
+controls the number of independent failure clusters:
+`n_clusters = (H*W) / (corr_tiles^2)`. Lower correlation -> more clusters
+-> lower yield. Higher correlation -> fewer clusters -> higher yield.
+This is the single most impactful parameter on final yield numbers.
+Must be calibrated to fab-specific defect correlation data.
 
-**Purpose:** Translate physics solver outputs into actionable layout-level design rule violations and optimize fill patterns.
+**References:**
+- Murphy, "Yield, Reliability, and Defect Density", Proc. IEEE, 1964.
+- Stapper, "Modeling of Defects in ICs", IBM J. Res. Dev., 1983.
 
-**DRC Rules Applied:**
+### 10.5 Optimizer: Gradient-Free Inverse Design
 
-| Rule | Threshold | Physical Basis |
-|---|---|---|
-| Minimum density | 0.15 | Below this, severe CMP dishing |
-| Maximum density | 0.85 | Above this, severe CMP erosion |
-| Maximum gradient | 0.10 per tile | Steep gradients cause CMP step-height |
-| Void risk | 0.70 | High probability of trapped void |
-| Delamination risk | 0.70 | High probability of interface failure |
-| CMP margin critical | 0.80 | CMP approaching process limit |
+**File:** `bondability/optimize/engine.py`
 
-**Inverse Design Optimizer (two strategies):**
+**Two optimizer strategies:**
 
-**Additive (Hill Climbing):** Identifies highest-risk tiles and places Gaussian fill blobs to bring density toward the 50% optimum. Multi-start restarts avoid local minima. Multi-objective fitness jointly minimizes void risk, delamination risk, CMP sigma, and thermal stress.
+**FillOptimizer (Additive Hill Climbing):**
+1. Evaluate baseline multi-objective fitness:
+   fitness = -(w_void*void + w_delam*delam + w_cmp*sigma/10 + w_thermal*stress/1000)
+2. For each restart x each iteration:
+   a. Identify highest combined-risk tile.
+   b. Place Gaussian fill blob at hotspot (configurable sigma, amplitude).
+   c. Check fill budget constraint.
+   d. Accept if fitness improves.
+3. Convergence patience: stop after N stalled iterations.
+4. Multi-start: avoids local minima.
 
-**Subtractive (Stress Minimizing):** Starts from a checker fill base, runs the thermal solver to find stress hotspots, and carves out fill at peak stress locations. Accepts changes only if yield is maintained and stress improves.
+**SubtractiveOptimizer (Stress Minimizing):**
+1. Start from checker fill base (50 um blocks, 40% fill strength).
+2. Run GPU thermal solver to find stress hotspots.
+3. Apply Gaussian carve-out at peak stress location.
+4. Accept only if yield maintained within tolerance AND stress improved.
+5. Adaptive: reduce carve amplitude on rejection.
 
----
-
-## Validated Results
-
-### Summary of All Benchmarks
-
-| Benchmark | Reference | Method | Result | Key Finding |
-|---|---|---|---|---|
-| CMP vs. Stine 1998 | IEEE TSM, 1998 | 5-point calibration, 6 held-out densities | **PASS** | Bathtub shape preserved, min near 50% density |
-| Contact vs. Turner 2002 | J. Appl. Phys., 2002 | 20 nm bump, 3 configurations | **PASS** | All 4 qualitative physics checks pass |
-| Thermal vs. Suhir 1986 | J. Appl. Mech., 1986 | Bimetallic strip, 50x50 grid | **PASS** | FD/analytical ratio within [0.3, 3.0] |
-| Yield sanity | Murphy 1964, Stapper 1983 | Low vs. high defect configs | **PASS** | Monotonic, bounded, seed-sensitive |
-
-**All 4 benchmarks pass. All 17 test files pass.**
-
-### Benchmark 1: CMP Model Validation (Stine et al. 1998 -- Hold-Out)
-
-The CMP model uses PCHIP interpolation calibrated to 5 data points from published literature. The critical validation is hold-out: the model is tested at 6 density values that are NOT calibration knots.
-
-**Calibration knots:** {0.0, 0.3, 0.5, 0.7, 1.0}
-**Hold-out test densities:** {0.1, 0.2, 0.4, 0.6, 0.8, 0.9}
-
-| Hold-Out Density | Predicted Recess (nm) | Within Expected Range | Physical Check |
-|---|---|---|---|
-| 0.10 | ~30 nm (Cu) / ~18 nm (Al) | Yes | High dishing region |
-| 0.20 | ~24 nm (Cu) / ~13 nm (Al) | Yes | Dishing decreasing |
-| 0.40 | ~12 nm (Cu) / ~7 nm (Al) | Yes | Approaching minimum |
-| 0.60 | ~11 nm (Cu) / ~6 nm (Al) | Yes | Past minimum, erosion starting |
-| 0.80 | ~22 nm (Cu) / ~12 nm (Al) | Yes | Erosion increasing |
-| 0.90 | ~28 nm (Cu) / ~16 nm (Al) | Yes | High erosion region |
-
-**Shape checks:**
-- Bathtub curve confirmed: minimum recess near 50% density
-- Endpoints higher than minimum
-- Monotonic decrease from 0% to 50%, monotonic increase from 50% to 100%
-- PCHIP interpolation avoids overshoot artifacts
-
-**Caveat:** Stine 1998 data is for aluminum CMP (legacy). The default production calibration now uses the copper_hybrid_bonding preset (Enquist 2019, Kim 2022). Both show the bathtub shape; copper has higher absolute recess values due to softer material.
-
-### Benchmark 2: Contact Mechanics (Turner & Spearing 2002)
-
-The spectral contact solver is tested against three configurations from the wafer bonding literature:
-
-| Configuration | Wafer Thickness | Adhesion Energy | Expected Behavior | Result |
-|---|---|---|---|---|
-| Thick wafer | 775 um | 0.5 J/m^2 | Bridges (residual gap > 0) | **Correct** |
-| Thin wafer | 10 um | 0.5 J/m^2 | Conforms (gap < 2 nm) | **Correct** |
-| High adhesion | 775 um | 5.0 J/m^2 | Reduced gap vs. standard | **Correct** |
-
-**Ordering check:** thick_wafer_gap > thin_wafer_gap -- **Correct**
-
-Test setup: 20 nm Gaussian bump on 64x64 grid. All 4 qualitative physics checks pass.
-
-**Caveat:** Qualitative physics checks at tile resolution (25 um). Quantitative gap values carry 2-5x error at this resolution. Use refine_factor >= 4 for quantitative accuracy.
-
-### Benchmark 3: Thermal FEA (Suhir 1986)
-
-The thermal solver is benchmarked against the Suhir analytical solution for bimetallic strip stress:
-
-```
-sigma_analytical = (E1 * E2) / (E1 + E2) * delta_alpha * delta_T
-```
-
-For Cu/SiO2 at delta_T = 275K: sigma_analytical ~ 350 MPa
-
-**Test:** Sharp Cu/SiO2 bimetallic interface on 50x50 grid, no smoothing.
-**Result:** FD/analytical ratio within [0.3, 3.0] -- **PASS**
-
-**Why 3x tolerance?** The sharp finite-difference interface creates a stress concentration (numerical singularity) that the analytical solution averages out. This is a well-known FD artifact at material discontinuities. The solver is therefore **conservative** (overestimates interfacial stress), which is the safe-side error for a screening tool.
-
-Optional `smooth_interface=True` mode applies 1-tile Gaussian smoothing at material boundaries, eliminating the FD singularity and producing stress values closer to the analytical solution.
-
-### Benchmark 4: Yield Model Sanity
-
-The Murphy/Stapper yield model is tested for mathematical correctness:
-
-| Check | Condition | Result |
-|---|---|---|
-| Monotonicity | yield(low_defect) > yield(high_defect) | **PASS** |
-| Bounds | All yields in [0, 1] | **PASS** |
-| Seed sensitivity | Different random seeds produce different yield distributions | **PASS** |
-
-### Test Suite Coverage
-
-17 test files cover all system components:
-
-| Test File | Coverage Area | Key Assertions |
-|---|---|---|
-| `test_smoke.py` | All module imports, config | Modules load, defaults valid |
-| `test_cmp.py` | CMP model correctness | Bathtub shape, PCHIP monotonicity |
-| `test_copper_cmp.py` | Cu-specific CMP calibration | Copper preset validation |
-| `test_physics_contact.py` | Spectral contact solver | Convergence, bridging/conforming |
-| `test_bonding_week3.py` | Bond void risk pipeline | Risk bounds [0,1], motif penalty |
-| `test_anneal_week4.py` | Anneal delamination pipeline | Stress index, CTE mismatch |
-| `test_yield_week5.py` | Monte Carlo yield engine | Yield bounds, sensitivity |
-| `test_rules_week6.py` | DRC rule compiler | Violation masks, thresholds |
-| `test_optimize_week7.py` | Fill optimizer | Yield improvement, budget |
-| `test_gds_ingestion.py` | GDS I/O via gdstk | Layout parsing, density |
-| `test_glass_bonding.py` | Glass bonding validation | Cross-pollination tests |
-| `test_multi_node.py` | Multi-node validation | Distributed consistency |
-| `test_scalability.py` | Scalability benchmarks | Performance scaling |
-| `test_cli.py` | CLI integration | Command execution, output |
-| `test_api.py` | REST API endpoints | HTTP status, schemas |
-| `test_benchmarks.py` | 4 published-data benchmarks | All pass |
-| `test_stress_adversarial.py` | Adversarial edge cases | Zero density, NaN, extremes |
+**Multi-objective weights (all configurable):**
+- `weight_void`: Bond void risk (default 1.0)
+- `weight_delam`: Delamination risk (default 1.0)
+- `weight_cmp_sigma`: CMP non-uniformity (default 0.5)
+- `weight_thermal`: GPU thermal peak stress (default 0.3)
 
 ---
 
-## Comparison: Bondability vs. Existing Tools
+## 11. Configuration Reference
 
-### Detailed Feature Comparison
+Configuration is managed via Pydantic v2 models in `bondability/config.py`.
+All parameters have documented defaults. Configuration can be loaded from
+YAML files or instantiated programmatically.
 
-| Capability | **Genesis Bondability** | COMSOL Manual Analysis | Ansys Bonding Module | Rule-of-Thumb DFM |
-|---|---|---|---|---|
-| **Input** | GDS/OASIS layout | Manual geometry import | FEA mesh | Density rule decks |
-| **Physics fidelity** | 6-stage coupled chain | Single-domain FEA | Thermal + structural | None (empirical) |
-| **CMP modeling** | EPL + PCHIP (calibrated) | Not included | Not included | Density rules only |
-| **Contact mechanics** | Spectral FFT O(N log N) | Direct FEM O(N^2) | Not standard | Not included |
-| **Thermal stress** | Plane-stress FEA (CPU+GPU) | Full 3D FEA | Full 3D FEA | Not included |
-| **Void prediction** | Dugdale CZM + gap model | Manual post-processing | Not standard | Not included |
-| **Yield prediction** | Murphy/Stapper + MC | Not included | Not included | Empirical lookup |
-| **Uncertainty quantification** | 200-sample Monte Carlo | Manual parametric study | No | No |
-| **Automation** | Fully automated pipeline | Manual setup (hours) | Semi-automated | Automated DRC only |
-| **Inverse design** | Multi-objective optimizer | Manual iteration | No | No |
-| **Typical runtime** | 5-30 seconds | 4-8 hours | 2-4 hours | <1 second |
-| **GDS-to-yield** | Yes (end-to-end) | No | No | No |
-| **Spatial correlation** | Stapper model | No | No | No |
-| **DRC output** | KLayout markers + violations | No | No | Yes |
-| **REST API** | 5 endpoints + Swagger | No | No | No |
-| **Cost** | Research license | $30K-$100K/seat/year | $50K-$150K/seat/year | Included in EDA |
-| **Calibration required** | Fab CMP data | Material properties | Material properties | Process rules |
+### Section 1: `process`
 
-### Why Bondability Wins on Speed
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `name` | str | "process" | Process identifier |
+| `pad_pitch_um` | float | 4.0 | Pad pitch in microns |
+| `anneal_temp_C` | float | 300.0 | Post-bond anneal temperature |
+| `anneal_time_min` | float | 60.0 | Anneal duration (minutes) |
 
-The spectral FFT approach gives Bondability a fundamental computational advantage over direct FEM methods for the contact mechanics problem:
+### Section 2: `cmp`
 
-| Grid Size | Bondability (FFT) | Direct FEM | Speedup |
-|---|---|---|---|
-| 32 x 32 | 0.5s | 10s | 20x |
-| 64 x 64 | 2s | 3 min | 90x |
-| 128 x 128 | 8s | 45 min | 340x |
-| 256 x 256 | 30s | ~6 hours | 720x |
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `epl_um` | float | 100.0 | Effective Planarization Length (um) |
+| `recess_nm_at_density` | Dict[float, float] | 5-point bathtub | Calibration: density -> recess (nm) |
+| `recess_sigma_nm` | float | 3.0 | Base recess variation (nm) |
+| `density_sigma_scale` | float | 0.5 | Density-dependent sigma scaling |
+| `surface_roughness_nm` | float | 0.5 | RMS surface roughness (nm) |
+| `gap_threshold_nm` | float | 15.0 | Gap threshold for CMP margin |
 
-These speedups enable Monte Carlo sampling (200 trials) and parametric sweeps that would be computationally prohibitive with direct FEM.
+### Section 3: `bonding`
 
-### Where COMSOL/Ansys Win
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `gap_nm_threshold` | float | 12.0 | Gap threshold for void risk |
+| `overlay_sigma_nm` | float | 20.0 | Overlay sigma (nm) |
+| `particle_ppm` | float | 10.0 | Particle contamination (ppm) |
+| `particle_density_cm2` | float | 0.5 | Particle density (defects/cm2) |
+| `particle_kill_radius_um` | float | 10.0 | Particle kill zone radius |
+| `warpage_um` | float | 1.0 | Wafer bow (um) |
+| `motif_penalty_factor` | float | 2.0 | Risk multiplier for bad motifs |
+| `max_acceptable_bow_um` | float | 5.0 | SEMI M1-0302 bow limit |
+| `use_physics_solver` | bool | True | Enable spectral contact solver |
+| `modulus_gpa` | float | 130.0 | Young's modulus (Si) |
+| `thickness_um` | float | 775.0 | Wafer thickness |
+| `adhesion_energy_j_m2` | float | 0.5 | Surface energy (J/m2) |
+| `poisson_ratio` | float | 0.28 | Si Poisson ratio |
+| `adhesion_range_nm` | float | 5.0 | Dugdale cohesive zone width |
+| `logistic_steepness` | float | 5.0 | Physics gap->risk steepness |
+| `logistic_steepness_heuristic` | float | 0.3 | Heuristic path steepness |
+| `gap_contact_threshold_nm` | float | 1.0 | Contact threshold |
+| `pad_pitch_um` | float | 4.0 | Pad pitch for overlay model |
+| `overlay_margin_ratio` | float | 0.4 | Fraction of pitch |
+| `overlay_edge_multiplier` | float | 1.3 | Edge sigma increase |
+| `wafer_diameter_mm` | float | 300.0 | Wafer diameter |
 
-To be honest about where general-purpose FEA tools are superior:
+### Section 4: `anneal`
 
-- **3D geometry:** COMSOL/Ansys handle full 3D meshes with arbitrary geometry. Bondability uses 2D plane-stress approximation.
-- **Material nonlinearity:** COMSOL/Ansys support elasto-plastic, creep, and viscoelastic models. Bondability is linear elastic only.
-- **Complex boundary conditions:** COMSOL/Ansys handle arbitrary BCs. Bondability supports free or clamped.
-- **Multi-physics coupling:** COMSOL can couple thermal-structural-fluid in a single model. Bondability couples physics sequentially, not simultaneously.
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `density_gradient_weight` | float | 1.0 | Gradient stress weight |
+| `max_gradient_ok` | float | 0.08 | Acceptable gradient threshold |
+| `stress_diffusion_length_um` | float | 10.0 | Stress diffusion length |
+| `edge_stress_weight` | float | 0.5 | Edge stress contribution |
+| `edge_decay_um` | float | 20.0 | Edge effect decay distance |
+| `cte_cu_ppm_K` | float | 17.0 | Copper CTE (ppm/K) |
+| `cte_dielectric_ppm_K` | float | 0.5 | SiO2 CTE (ppm/K) |
+| `anneal_temp_C` | float | 300.0 | Anneal temperature (C) |
+| `use_thermal_fea` | bool | False | Enable full thermal FEA |
+| `interface_flaw_um` | float | 5.0 | Worst-case flaw size (um) |
+| `mixing_rule` | str | "voigt" | "voigt" or "reuss" |
 
-Bondability trades single-domain fidelity for end-to-end integration and speed. For the design-stage screening use case -- "which layout changes will improve bonding yield?" -- this trade-off is appropriate.
+### Section 5: `yield_model`
 
----
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `monte_carlo_samples` | int | 200 | MC trial count |
+| `sensitivity_analysis` | bool | True | Enable sensitivity elasticity |
+| `random_seed` | int or None | 42 | Reproducibility seed |
+| `dist_overlay_sigma` | (float, float) | (20.0, 3.0) | Overlay sigma distribution (mean, std) |
+| `dist_particle_density` | (float, float) | (0.5, 0.1) | Particle density distribution |
+| `dist_roughness_nm` | (float, float) | (0.5, 0.1) | Surface roughness distribution |
+| `correlation_length_um` | float | 500.0 | **CRITICAL:** Spatial correlation length |
+| `adhesion_range_nm` | float | 5.0 | For gap threshold derivation |
+| `gap_threshold_nm` | float | 15.0 | Roughness perturbation threshold |
+| `edge_exclusion_tiles` | int | 2 | Tiles to exclude per edge |
 
-## Key Discoveries and Innovations
+### Section 6: `rules`
 
-### 1. Complete Physics Chain Modeling (GDS-to-Yield)
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `tile_um` | float | 25.0 | Tile size (um) |
+| `max_density_gradient` | float | 0.10 | Max gradient threshold |
+| `min_density` | float | 0.15 | Minimum density rule |
+| `max_density` | float | 0.85 | Maximum density rule |
+| `void_risk_threshold` | float | 0.7 | Void hotspot threshold |
+| `delam_risk_threshold` | float | 0.7 | Delamination hotspot threshold |
+| `cmp_margin_threshold` | float | 0.8 | CMP margin critical threshold |
 
-Bondability is, to our knowledge, the first open research platform that models the full six-stage physics chain from GDS layout to yield prediction for hybrid bonding. The key innovation is not in any single solver -- each uses established physics -- but in the integration: connecting CMP to contact mechanics to void formation to thermal stress to delamination to yield in a single automated pipeline.
+### Section 7: `optimize`
 
-### 2. Spectral FFT for Hybrid Bonding Contact Mechanics
-
-While spectral contact mechanics is well-established in tribology (Persson 2006, Greenwood & Williamson 1966), its application to the hybrid bonding yield prediction problem is novel. The specific integration of:
-- Spectral elastic kernel (plate bending + surface compliance)
-- Dugdale cohesive zone adhesion (smoothed softplus)
-- L-BFGS-B energy minimization with box constraints
-- Mesh refinement for sub-tile resolution
-
-...within an automated yield prediction pipeline is the contribution.
-
-### 3. Stress-Resonant Spacing Discovery
-
-A discovery from computational parameter sweeps: at certain spatial frequencies of density variation, thermal stress from CTE mismatch exhibits resonance-like amplification. When the spacing between density features matches the stress diffusion length (~10 um for typical Cu/SiO2 stacks), interference constructively amplifies peak stress. This leads to a concrete design rule:
-
-**Avoid periodic density patterns at spacings matching the stress diffusion length.**
-
-The subtractive optimizer specifically targets stress hotspots created by this resonance effect. This discovery, while computationally derived and not yet experimentally validated, identifies a physical mechanism that could be verified through thermal stress measurements on patterned test structures.
-
-### 4. Gradient-Compensated Dummy Fill
-
-Standard dummy fill algorithms (checker patterns, rule-based insertion) optimize for CMP uniformity alone. They do not consider the downstream effects of fill patterns on bonding yield and thermal stress. Bondability's inverse design optimizer jointly minimizes four objectives simultaneously:
-
-1. Bond void risk (from CMP non-uniformity)
-2. Delamination risk (from thermal stress)
-3. CMP recess sigma (uniformity)
-4. Peak thermal stress
-
-This multi-objective approach recognizes that the optimal fill pattern for CMP uniformity is not necessarily the optimal fill pattern for bonding yield. The optimizer uses both additive (hill-climbing at risk hotspots) and subtractive (carve-out at stress hotspots) strategies, with multi-start restarts to avoid local minima.
-
-### 5. Spatial Correlation in Bonding Yield
-
-Most simple yield models treat defect sites as independent. This systematically underestimates yield for large dies because it ignores the spatial clustering of defects. Bondability implements the Murphy/Stapper spatial correlation model, which partitions the die into correlated failure clusters. This correctly captures that a CMP non-uniformity problem at location (x,y) typically means neighboring locations have the same problem -- because CMP physics is spatially correlated.
-
----
-
-## Applications
-
-### HBM (High Bandwidth Memory) -- HBM4 and Beyond
-
-HBM stacks 4-16 DRAM dies using hybrid bonding. Each die has thousands of bond pads at sub-10 um pitch. Bondability can predict per-die yield from the memory array layout, identifying:
-
-- **Density regions** that will cause CMP non-uniformity (e.g., the transition from dense memory array to sparse peripheral circuits)
-- **Void risk hotspots** at array edges where density gradients are steepest
-- **Thermal stress concentrations** at the interfaces between Cu-dense array regions and Cu-sparse I/O regions
-- **Bond-aware design rules** specific to the memory array geometry
-
-HBM is a particularly strong fit for physics-based yield prediction because the memory array layout is highly regular, with repeating pad patterns at known pitches. The CMP behavior of regular arrays is well-characterized and the density map is straightforward to extract. The primary yield challenges are at the array edges (density gradients) and at the die edges (edge exclusion effects).
-
-**Relevant Bondability capabilities:** Full pipeline + sensitivity analysis to identify whether overlay, CMP, or thermal dominates yield loss.
-
-### TSMC SoIC (System on Integrated Chips)
-
-TSMC's SoIC is the industry's leading chiplet integration technology. It bonds heterogeneous dies (logic, memory, analog, photonic) with different density patterns at the bond interface. The density gradient between a high-density logic chiplet (~80% Cu density) and a low-density memory chiplet (~30% Cu density) creates exactly the kind of CMP non-uniformity that drives bonding voids.
-
-**Relevant Bondability capabilities:** Gradient-compensated fill optimizer, CMP explainability maps showing density deficit and gradient magnitude as dominant risk drivers.
-
-### Intel Foveros
-
-Intel's Foveros technology uses face-to-face hybrid bonding for logic-on-logic 3D stacking. The Meteor Lake architecture uses Foveros to connect compute tiles, I/O tiles, and SoC tiles. The key challenge is bonding dissimilar die types with different pad densities and different CMP histories.
-
-**Relevant Bondability capabilities:** Multi-configuration sweeps to evaluate bonding compatibility between die types, thermal stress analysis for the compound CTE mismatch in multi-die stacks.
-
-### Samsung X-Cube
-
-Samsung's X-Cube 3D chiplet stacking technology is deployed for foundry customers requiring high-density die-to-die interconnects. X-Cube competes directly with TSMC SoIC and faces the same CMP-to-yield physics chain.
-
-**Relevant Bondability capabilities:** Design rule compiler generating bond-aware layout guidelines, KLayout DRC marker output for integration with Samsung's physical verification flow.
-
-### Chiplet-to-Wafer (C2W) and Wafer-to-Wafer (W2W) Bonding
-
-Bondability supports both bonding paradigms:
-
-- **Chiplet-to-wafer (C2W):** Individual dies are picked and placed onto a receiving wafer. Higher overlay sigma (~1-3 um for C2W vs. ~50-200 nm for W2W), but allows heterogeneous die sizes. The overlay risk model scales with (sigma/pitch)^2.
-- **Wafer-to-wafer (W2W):** Two full wafers are bonded simultaneously. Better overlay (~50-200 nm) but requires identical die sizes on both wafers. Lower overlay risk but higher sensitivity to wafer-scale warpage.
-
-### Foundry Process Development
-
-For foundries developing hybrid bonding processes (TSMC, Samsung, Intel, GlobalFoundries), Bondability can accelerate process-design co-optimization. By replacing the default CMP calibration with fab-specific measurements, the platform predicts how process changes (CMP recipe, anneal temperature, overlay capability) propagate to yield -- before running wafers.
-
-The sensitivity analysis module is particularly valuable: it computes the elasticity of yield with respect to each process parameter, identifying which process improvements will have the largest impact on yield. This enables data-driven prioritization of process development efforts, potentially saving multiple experimental iteration cycles.
-
-### Equipment Suppliers
-
-Bonding equipment suppliers (EV Group, SUSS MicroTec, Tokyo Electron) can use physics-based yield models to:
-- Optimize tool parameters (bonding force, temperature ramp rate, atmosphere control)
-- Provide yield guidance to their customers
-- Differentiate their equipment by demonstrating physics-based yield prediction capability
-- The contact mechanics solver directly models the bonding physics that equipment parameters control
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `fill_sigma_tiles` | float | 2.0 | Gaussian blob sigma |
+| `fill_amplitude` | float | 0.1 | Max density increment per blob |
+| `max_fill_fraction` | float | 0.5 | Total fill budget |
+| `convergence_tol` | float | 1e-4 | Stop threshold |
+| `convergence_patience` | int | 3 | Stalled iteration patience |
+| `iterations` | int | 15 | Max iterations per restart |
+| `restarts` | int | 2 | Multi-start restarts |
+| `weight_void` | float | 1.0 | Void risk objective weight |
+| `weight_delam` | float | 1.0 | Delamination objective weight |
+| `weight_cmp_sigma` | float | 0.5 | CMP uniformity weight |
+| `weight_thermal` | float | 0.3 | Thermal stress weight |
+| `use_gpu_thermal` | bool | True | GPU thermal in optimizer loop |
+| `thermal_eval_interval` | int | 5 | Thermal eval every N steps |
 
 ---
 
-## Cross-Platform Integration
-
-Bondability is part of the Genesis Platform (PROV 9), which includes complementary technologies for semiconductor manufacturing:
-
-### PROV 2: Packaging Warpage Simulation
-
-**Connection:** PROV 2 computes wafer-level warpage from film stress, CTE mismatch, and thermal loading. This warpage directly affects the contact pressure distribution during hybrid bonding. Bondability currently uses a simple `warpage_um` input parameter; integration with PROV 2 would provide physics-based warpage computation that feeds into the contact mechanics solver.
-
-**Integration point:** PROV 2 warpage output (um) --> Bondability `BondingConfig.warpage_um` --> modified contact pressure in spectral solver.
-
-### PROV 7: Glass PDK for Heterogeneous Integration
-
-**Connection:** PROV 7 develops glass substrate process design kits for heterogeneous integration. Glass-to-silicon hybrid bonding has different adhesion energies, CTE values, and CMP behaviors compared to silicon-to-silicon bonding. Bondability includes a `cross_pollination/glass_bonding.py` module that adapts the physics chain for glass substrates.
-
-**Integration point:** PROV 7 glass material properties --> Bondability glass bonding model --> yield prediction for glass-based hybrid bonding (relevant to glass core substrates for high-frequency applications).
-
-### PROV 1: Fab OS (Fabrication Operating System)
-
-**Connection:** PROV 1 develops wafer-level process control and scheduling. Bondability's yield predictions can feed into PROV 1's process control loop: predicted yield per wafer informs real-time process adjustments (CMP recipe tuning, bonding force optimization) based on incoming density maps.
-
-**Integration point:** Bondability REST API (5 endpoints) --> PROV 1 process control decision engine --> closed-loop yield optimization.
-
----
-
-## Research-Stage Patent Portfolio
-
-### Overview
-
-Bondability has 13 research-stage claims that articulate the technical contributions of the platform. These claims are **research claims**, not legal patent claims. No provisional patent application has been filed. The claims have not been reviewed by patent counsel.
-
-The purpose of documenting these claims is to establish the technical contributions and their priority dates, not to assert legal rights.
-
-### Claim Summary (No Verbatim Patent Text)
-
-| # | Claim Area | Key Technique | Validation Status |
-|---|---|---|---|
-| 1 | End-to-end GDS-to-yield prediction | 6-stage physics chain | Published benchmarks (4/4 pass) |
-| 2 | CMP planarity prediction | Preston/PCHIP/EPL convolution | Stine 1998 hold-out validation |
-| 3 | Contact mechanics for Cu-Cu bonding | Spectral FFT + Dugdale CZM | Turner 2002 qualitative checks |
-| 4 | Anneal thermal stress analysis | Voigt mixing + plane-stress FEA | Suhir 1986 analytical solution |
-| 5 | Monte Carlo uncertainty quantification | Murphy/Stapper + 200 MC samples | Sanity checks (monotonicity, bounds) |
-| 6 | Design rule compiler for bond-aware layout | Threshold-based DRC + KLayout output | Functional tests |
-| 7 | Inverse design reliability optimizer | Multi-objective fill optimization | Yield improvement on synthetic layouts |
-| 8 | Gradient-compensated dummy fill | Joint CMP + bonding + thermal fill | Synthetic layout demonstrations |
-| 9 | Stress-resonant spacing avoidance | Parametric sweep design rule | Computational observation only |
-| 10 | Discrete inverse design via sigmoid projection | Continuous relaxation of binary fill | Experimental |
-| 11 | Evolutionary inverse design (GA) | Genetic algorithm fill optimization | Experimental |
-| 12 | Spectral FFT + Dugdale CZM combination | FFT kernel + cohesive zone + L-BFGS-B | Turner 2002 qualitative checks |
-| 13 | Complete GDS-to-yield software pipeline | 61 source files, 7 CLI, 5 API endpoints | 17 test files (all passing) |
-
-### Intellectual Property Positioning
-
-The IP contribution is at the **system integration** level, not the individual component level. Each solver uses established physics and algorithms (spectral methods, Dugdale CZM, Murphy yield, PCHIP interpolation). The novelty is in:
-
-1. The specific combination of these techniques for the hybrid bonding yield prediction problem
-2. The automated pipeline from GDS input to yield output
-3. The multi-objective inverse design optimizer that jointly considers CMP, contact, thermal, and yield
-4. The discovery of stress-resonant spacing effects from computational parameter sweeps
-
-Individual components (spectral contact mechanics, Dugdale CZM, Murphy yield model) are well-established in the literature and are cited appropriately.
-
----
-
-## Honest Disclosures
-
-**This section is critical. Read it before evaluating any claims.**
-
-### 1. Research Status -- Not Production Software
-
-This is research-stage software (v2.0). It has not been filed as a provisional patent. The 13 claims are research claims, not legal claims. The platform has not been deployed in a production fab environment. It has not been tested against proprietary fab data. It is computationally complete and architecturally sound, but it is not manufacturing-ready.
-
-### 2. Computational Only -- No Fabricated Wafers
-
-No bonded wafers have been fabricated as part of this work. No fab process data has been collected. All results are computational predictions from physics-based models. Computational models, no matter how physically grounded, must ultimately be validated against experimental data from a specific fab process. Until that calibration occurs, all yield predictions are directional (correct physics, uncalibrated magnitude).
-
-### 3. Validated Against Published Benchmarks, Not Proprietary Fab Data
-
-The four validation benchmarks use published academic data:
-
-| Benchmark | Reference | Data Type | Limitation |
-|---|---|---|---|
-| CMP recess | Stine 1998; Ouma 2002 | Published CMP data | Al data (Stine), Cu data (Ouma) |
-| Contact mechanics | Turner & Spearing 2002 | Wafer bonding theory | Qualitative checks only |
-| Thermal stress | Suhir 1986 | Analytical solution | Bimetallic strip idealization |
-| Yield model | Murphy 1964 | Yield theory | Sanity checks, not fab data |
-
-None of these benchmarks use proprietary data from TSMC, Samsung, Intel, or any other foundry.
-
-### 4. CMP Calibration Requirements
-
-The default CMP calibration now uses the **copper_hybrid_bonding** preset (based on Enquist 2019, Kim 2022). Two presets are available:
-- **copper_hybrid_bonding (default):** Cu CMP data calibrated for hybrid bonding applications (Enquist 2019, Kim 2022). This replaces the previous aluminum-based default.
-- **Aluminum (legacy):** Stine et al. 1998 Al CMP data. Retained for comparison only.
-
-The copper_hybrid_bonding preset is based on published academic data (Enquist 2019, Kim 2022), not fab-specific production data. **Any production deployment MUST replace the default calibration with fab-specific Cu CMP measurements.** This is the single most critical calibration item. The platform includes a calibration module for loading custom data.
-
-### 5. Spectral FFT Is a Standard Technique
-
-The spectral approach to contact mechanics is well-established in tribology (Persson 2006, Greenwood & Williamson 1966, Stanley & Kato 1997). Our contribution is not inventing spectral contact mechanics. It is applying it to the hybrid bonding problem within an end-to-end yield prediction pipeline.
-
-### 6. Linear Elastic Thermal Solver -- No Plasticity
-
-The thermal FEA is linear elastic only. At 300C anneal with sharp Cu/SiO2 interfaces, peak elastic stress can exceed Cu yield (~300 MPa at temperature). In reality, copper yields plastically and stress redistributes via creep and relaxation. The solver is therefore **conservative** (overestimates interfacial stress at material boundaries), which is the safe-side error for a screening tool.
-
-Implementing proper incremental plasticity (load stepping, tangent stiffness updates, deviatoric radial return mapping) was a deliberate scope decision. It would add significant complexity for a modest improvement in stress accuracy at design-stage screening resolution.
-
-### 7. Correlation Length Dominates Yield
-
-The yield model's `correlation_length_um` parameter (default 500 um) is uncalibrated and dominates yield predictions by ~100x. Changing it from 200 um to 2000 um can swing yield by 20+ percentage points. This single parameter is the most impactful tunable on final yield numbers. **Use for relative layout comparison only, not absolute prediction.** Any quantitative yield prediction requires calibrating this parameter against actual fab yield measurements.
-
-### 8. Contact Solver Under-Resolution at Tile Scale
-
-The Dugdale cohesive zone width (dc = 5 nm) operates at nanometer scale, but the default tile grid is at 25 um. At tile resolution, the solver produces qualitatively correct bridging/conforming behavior but quantitative gap values carry 2-5x error. Use `refine_factor >= 4` for quantitative accuracy at the cost of 16x computation.
-
-### 9. No Wafer-Level Warpage Model
-
-The platform uses a simple `warpage_um` parameter but does not compute warpage from first principles. A proper warpage model requires wafer-scale (300mm) FEA, full film stack stress integration, and thermal gradient effects. Integration with PROV 2 (Packaging Warpage) would address this gap.
-
-### 10. No Multi-Layer CMP Interaction
-
-The CMP model is single-layer (2D effective density). It does not model multi-layer CMP interactions, dishing propagation through stacked layers, or TSV topography effects. For multi-layer 3D stacks (e.g., 12-high HBM), each bonding interface needs independent modeling.
-
-### 11. Heuristic Motif Detection
-
-Motif detection (isolated pads, TSV proximity, extreme gradients) uses threshold-based heuristics, not true pattern recognition. It cannot identify specific layout structures such as guard rings, seal rings, or specific dummy fill geometries.
-
-### 12. ML Surrogate Is Experimental
-
-The ML surrogate module exists in the codebase but is experimental. It is NOT used in the production physics pipeline. The training dataset is small (200 samples) and the surrogate has not been validated for accuracy against the physics solvers across the full parameter space.
-
-### 13. Test Suite Demonstrates Code Quality, Not Manufacturing Readiness
-
-The 17 test files cover all solver modules, pipeline integration, CLI, API, and adversarial edge cases. All tests pass. This demonstrates code quality, internal consistency, and correct implementation of published physics models. It does **not** demonstrate manufacturing readiness, fab-calibrated accuracy, or production deployment capability.
-
----
-
-## Evidence and Verification
-
-### What We Provide
-
-- **Verification script** (`verification/verify_claims.py`): Automated checks for CMP prediction, contact mechanics, Murphy yield, FFT scaling, and physics chain completeness. Run this to independently verify all claims.
-- **Reference data** (`verification/reference_data/canonical_values.json`): Canonical solver parameters and validation targets, including all calibration knots, physical constants, and benchmark criteria.
-- **Key results** (`evidence/key_results.json`): Summary of all benchmark outcomes with pass/fail status, detailed check results, and caveats for each benchmark.
-- **Solver overview** (`docs/SOLVER_OVERVIEW.md`): Conceptual description of each solver stage, algorithms, physics basis, and references. No source code included.
-- **Reproduction guide** (`docs/REPRODUCTION_GUIDE.md`): Step-by-step instructions for reproducing benchmark results.
-
-### What We Do NOT Provide
-
-- Solver source code (proprietary, held in private repository)
-- Patent application text (research claims only, no legal filings)
-- Fabricated wafer data (none exists -- this is computational research)
-- Proprietary fab CMP calibration data (no fab partnership yet)
-- GDS layout files (proprietary customer data)
-- Trained ML model weights (experimental module, not production)
-- Deployment or production integration documentation
-
-### Codebase Metrics
-
-| Metric | Value |
-|---|---|
-| Production source files | 61 Python files in `bondability/` |
-| Production lines of code | ~4,500 LOC |
-| Test files | 17 |
-| Test status | All passing |
-| CLI commands | 7 (`run`, `optimize`, `analyze`, `benchmark`, `correlate`, `config show`, `config validate`, `serve`) |
-| REST API endpoints | 5 (`/simulate`, `/optimize`, `/validate`, `/health`, `/benchmarks`) |
-| Published benchmarks | 4 (all passing) |
-| Configuration parameters | 50+ (all with documented defaults) |
-| Archive proof scripts | 45 historical scripts |
-| Archived pipeline runs | 6 complete run outputs |
-
----
-
-## Repository Structure
-
-```
-Genesis-PROV9-Bondability/
-|-- README.md                           # This document
-|-- CLAIMS_SUMMARY.md                   # 13 research claims with validation status
-|-- HONEST_DISCLOSURES.md               # Complete limitations and caveats
-|-- LICENSE                             # CC BY-NC-ND 4.0
-|
-|-- verification/
-|   |-- verify_claims.py                # Automated claim verification script
-|   |-- reference_data/
-|       |-- canonical_values.json       # Reference solver parameters and targets
-|
-|-- evidence/
-|   |-- key_results.json                # Benchmark result summary (all 4 pass)
-|
-|-- docs/
-    |-- SOLVER_OVERVIEW.md              # Solver architecture (no source code)
-    |-- REPRODUCTION_GUIDE.md           # How to reproduce benchmark results
-```
-
-### Production Codebase Architecture (Private Repository)
-
-The production codebase follows a modular architecture with clear separation of concerns:
-
-```
-bondability/                     # Production package root
-|-- cli.py                       # Typer CLI (7 commands)
-|-- config.py                    # Pydantic v2 config schemas (7 sections)
-|-- pipeline.py                  # End-to-end orchestration
-|-- report.py                    # HTML signoff report generator
-|-- audit.py                     # Audit trigger logic
-|
-|-- api/                         # REST API (FastAPI + Swagger)
-|   |-- server.py                # 5 endpoint routes
-|   |-- jobs.py                  # Async job store
-|   |-- schemas.py               # Request/response models
-|
-|-- physics/                     # Core physics solvers
-|   |-- thermal.py               # CPU thermal FEA (scipy sparse)
-|   |-- gpu_thermal.py           # GPU thermal FEA (PyTorch CG)
-|   |-- gpu_thermal_3d.py        # Multi-layer 3D thermal
-|   |-- contact.py               # Spectral FFT + Dugdale CZM
-|   |-- plate_gpu.py             # GPU plate bending
-|   |-- transient.py             # Transient thermal analysis
-|
-|-- cmp/                         # CMP prediction
-|   |-- model.py                 # PCHIP + EPL kernel
-|   |-- calibration.py           # Fab data calibration
-|   |-- copper_cmp_calibration.py # Cu-specific calibration
-|
-|-- bonding/                     # Bond void risk
-|   |-- model.py                 # Gap-threshold + physics solver
-|
-|-- anneal/                      # Anneal delamination
-|   |-- model.py                 # CTE mismatch + fracture mechanics
-|
-|-- yield_model/                 # Monte Carlo yield
-|   |-- model.py                 # Murphy/Stapper + spatial correlation
-|
-|-- features/                    # Density extraction
-|-- io/                          # GDS/OASIS + KLayout I/O
-|-- optimize/                    # Inverse design optimizer
-|-- rules/                       # DRC rule compiler
-|-- validation/                  # Benchmarks + fab correlation
-|-- cross_pollination/           # Glass bonding extension
-|-- ml/                          # Surrogate model (experimental)
-|-- uq/                          # Uncertainty quantification
-|-- viz/                         # Plot generation
-|-- demo/                        # Synthetic layout generator
+## 12. Test Suite
+
+### Test Inventory (17 files)
+
+All tests use pytest. Run with `make test` (fast, excludes slow) or
+`make test-all` (including benchmarks).
+
+| File | Tests | Marks | What It Validates |
+|------|-------|-------|-------------------|
+| `test_smoke.py` | ~5 | none | All modules import, AppConfig instantiates, pipeline function exists |
+| `test_cmp.py` | ~8 | none | PCHIP interpolator shape, bathtub curve monotonicity, recess bounds, sigma density-dependence |
+| `test_physics_contact.py` | ~6 | none | Spectral solver convergence, bridge/conform ordering, adhesion effect, negative topology handling |
+| `test_bonding_week3.py` | ~5 | none | Void risk bounds [0,1], open bond risk, motif penalty effect, physics vs. heuristic path |
+| `test_anneal_week4.py` | ~5 | none | Stress index, CTE mismatch direction, gradient weight, edge stress |
+| `test_yield_week5.py` | ~6 | none | Yield in [0,1], sensitivity monotonicity, seed reproducibility, edge exclusion effect |
+| `test_rules_week6.py` | ~5 | none | Violation masks shape, threshold behavior, suggestions generation |
+| `test_optimize_week7.py` | ~4 | slow | Fill optimizer yield improvement, budget enforcement, subtractive stress reduction |
+| `test_gds_ingestion.py` | ~4 | none | GDS file parsing via gdstk, density extraction, layer selection |
+| `test_cli.py` | ~5 | none | CLI command execution, output file creation, error handling |
+| `test_api.py` | ~6 | none | REST endpoint HTTP status codes, response schema validation, health check |
+| `test_benchmarks.py` | ~4 | slow | All 4 published-data benchmarks pass |
+| `test_copper_cmp.py` | ~6 | none | Copper-specific CMP calibration, Cu recess curves, Preston equation parameters |
+| `test_glass_bonding.py` | ~8 | none | Glass bonding cross-pollination, AGC/Corning/Schott material properties, bond energy prediction |
+| `test_multi_node.py` | ~5 | none | Multi-node validation, distributed pipeline, cross-node consistency |
+| `test_scalability.py` | ~4 | slow | Large-grid scalability, memory usage, wall-time benchmarks |
+| `test_stress_adversarial.py` | ~8 | none | Edge cases: all-zero density, all-one density, tiny grids, NaN input, extreme temperatures |
+
+### Running Tests
+
+```bash
+# Fast tests only (excludes benchmarks and GPU)
+make test
+
+# Equivalent:
+pytest tests/ -q -m "not slow"
+
+# All tests including benchmarks
+make test-all
+
+# With coverage
+pytest tests/ --cov=bondability --cov-report=term-missing
+
+# Single test file
+pytest tests/test_physics_contact.py -v
 ```
 
 ---
 
-## Citation and References
+## 13. Validation Benchmarks
 
-### Citing This Work
+The platform includes 4 self-validation benchmarks that compare solver
+outputs against published experimental and analytical data. These run
+via `bondability benchmark` or the `/api/v1/benchmarks` endpoint.
 
-```
-Genesis PROV 9: Bondability -- Physics-Based Hybrid Bonding Yield Prediction
-from GDS Layout to Manufacturing Outcome. Genesis Platform, 2026.
-```
+**Design principle:** NO CIRCULAR VALIDATION. Benchmarks test against
+data independent of calibration inputs.
 
-### Primary References
+### Benchmark 1: CMP vs. Stine et al. 1998 (HOLD-OUT)
 
-| Reference | Used For | Stage |
-|---|---|---|
-| Stine, B.E. et al., "Rapid Characterization and Modeling of Pattern-Dependent Variation in Chemical-Mechanical Polishing," IEEE Trans. Semicond. Manuf., vol. 11, no. 1, 1998. | CMP bathtub curve calibration (Al) | Stage 2 |
-| Ouma, D.O. et al., "Characterization and Modeling of Oxide CMP Using Planarization Length and Pattern Density Concepts," IEEE Trans. Semicond. Manuf., 2002. | CMP bathtub curve calibration (Cu) | Stage 2 |
-| Turner, K.T. and Spearing, S.M., "Modeling of Direct Wafer Bonding: Effect of Wafer Bow and Etch Patterns," J. Appl. Phys., vol. 92, no. 12, 2002. | Contact mechanics validation | Stage 3 |
-| Suhir, E., "Stresses in Bi-Metal Thermostats," J. Appl. Mech., vol. 53, 1986. | Thermal stress analytical benchmark | Stage 4 |
-| Murphy, B.T., "Cost-Size Optima of Monolithic Integrated Circuits," Proc. IEEE, vol. 52, no. 12, 1964. | Negative-binomial yield model | Stage 5 |
-| Stapper, C.H., "Modeling of Defects in Integrated Circuit Photolithographic Patterns," IBM J. Res. Dev., vol. 27, no. 5, 1983. | Spatial defect correlation | Stage 5 |
+- **Reference:** Stine et al., "Rapid Characterization and Modeling of
+  Pattern-Dependent Variation in CMP", IEEE TSM, 1998, Table II.
+- **Method:** Default calibration has knots at {0.0, 0.3, 0.5, 0.7, 1.0}.
+  Benchmark tests at HELD-OUT densities {0.1, 0.2, 0.4, 0.6, 0.8, 0.9}
+  that are NOT calibration knots.
+- **Checks:**
+  - 6 hold-out density points within expected ranges from paper data.
+  - Bathtub curve shape: minimum near 0.5 density.
+  - Endpoints higher than minimum.
+- **Pass criteria:** All hold-out predictions within expected ranges AND
+  shape checks pass.
 
-### Supporting References
+### Benchmark 2: Contact Solver vs. Turner & Spearing 2002
 
-- Persson, B.N.J., "Contact Mechanics for Randomly Rough Surfaces," Surf. Sci. Rep., vol. 61, 2006.
-- Maugis, D., "Adhesion of Spheres: The JKR-DMT Transition Using a Dugdale Model," J. Colloid Interface Sci., vol. 150, 1992.
-- Cunningham, J.A., "The Use and Evaluation of Yield Models in Integrated Circuit Manufacturing," IEEE Trans. Semicond. Manuf., vol. 3, no. 2, 1990.
-- Greenwood, J.A. and Williamson, J.B.P., "Contact of Nominally Flat Surfaces," Proc. R. Soc. London A, vol. 295, 1966.
-- Stanley, H.M. and Kato, T., "An FFT-Based Method for Rough Surface Contact," J. Tribol., 1997.
-- Hutchinson, J.W. and Suo, Z., "Mixed Mode Cracking in Layered Materials," Adv. Appl. Mech., vol. 29, 1992.
-- Timoshenko, S.P. and Goodier, J.N., "Theory of Elasticity," 3rd Ed., McGraw-Hill, 1970.
+- **Reference:** Turner & Spearing, "Modeling of Direct Wafer Bonding",
+  J. Appl. Phys., 2002, Fig. 4.
+- **Method:** 20 nm Gaussian bump on 64x64 grid. Tests three configurations:
+  thick wafer (775 um), thin wafer (10 um), high adhesion (5 J/m2).
+- **Checks:**
+  - Thick wafer bridges (residual gap > 0).
+  - Thin wafer conforms (gap < 2 nm).
+  - High adhesion reduces gap vs. standard.
+  - Correct ordering: thick_gap > thin_gap.
+- **Pass criteria:** All 4 qualitative physics checks pass.
 
----
+### Benchmark 3: Thermal FEA vs. Suhir 1986
 
-## Appendix A: Glossary of Terms
+- **Reference:** Suhir, "Stresses in Bi-Metal Thermostats", J. Appl.
+  Mech., 1986.
+- **Method:** Sharp Cu/SiO2 bimetallic strip (50x50 grid, no smoothing).
+  Analytical Suhir solution: sigma = E1*E2/(E1+E2) * delta_alpha * delta_T.
+- **Checks:**
+  - Solver converges (mandatory, no waivers).
+  - Peak FD interface stress within 3x of analytical. (Why 3x? Sharp FD
+    interface creates stress concentration that analytical solution averages
+    out. This is CONSERVATIVE -- safe-side error.)
+- **Pass criteria:** Convergence AND ratio within [0.3, 3.0].
 
-| Term | Definition |
-|---|---|
-| **Hybrid bonding** | Direct Cu-Cu thermocompression bonding without solder, enabling sub-10 um pad pitch |
-| **CMP** | Chemical-Mechanical Polishing/Planarization -- process to achieve sub-nm surface flatness |
-| **Dishing** | Cu recess below surrounding dielectric after CMP -- occurs at low pad density |
-| **Erosion** | Dielectric thinning at high pad density after CMP |
-| **EPL** | Effective Planarization Length -- spatial averaging scale of the CMP process (~100 um) |
-| **PCHIP** | Piecewise Cubic Hermite Interpolating Polynomial -- monotonicity-preserving interpolation |
-| **Dugdale CZM** | Dugdale Cohesive Zone Model -- constant-traction adhesion model for interface mechanics |
-| **CTE** | Coefficient of Thermal Expansion -- how much material expands per degree of temperature change |
-| **Murphy model** | Negative-binomial yield model: Y = 1/(1+D) per defect cluster |
-| **Stapper model** | Spatial correlation model for defect clustering in yield prediction |
-| **SoIC** | System on Integrated Chips -- TSMC's chiplet integration technology using hybrid bonding |
-| **Foveros** | Intel's 3D stacking technology using face-to-face hybrid bonding |
-| **X-Cube** | Samsung's 3D chiplet stacking technology |
-| **HBM** | High Bandwidth Memory -- stacked DRAM using hybrid bonding (HBM4+) |
-| **W2W** | Wafer-to-Wafer bonding -- bonding two full wafers simultaneously |
-| **C2W** | Chiplet-to-Wafer bonding -- placing individual dies onto a receiving wafer |
-| **GDS** | Graphic Design System -- standard layout format for semiconductor masks |
-| **OASIS** | Open Artwork System Interchange Standard -- compressed layout format |
-| **KLayout** | Open-source layout viewer/editor with DRC marker support |
-| **L-BFGS-B** | Limited-memory BFGS with Bound constraints -- optimization algorithm |
-| **FFT** | Fast Fourier Transform -- O(N log N) algorithm for spectral decomposition |
-| **Von Mises stress** | Equivalent scalar stress measure for multi-axial stress states |
-| **Voigt mixing** | Upper-bound rule-of-mixtures for composite elastic properties |
+### Benchmark 4: Yield Model Sanity + Seed Configurability
 
----
-
-## Appendix B: Configuration Quick Reference
-
-### Minimal Configuration (YAML)
-
-```yaml
-process:
-  name: "hbm4_demo"
-  pad_pitch_um: 4.0
-  anneal_temp_C: 300.0
-
-cmp:
-  epl_um: 100.0
-  cmp_material: copper
-
-bonding:
-  use_physics_solver: true
-  thickness_um: 775.0
-  adhesion_energy_j_m2: 0.5
-
-yield_model:
-  monte_carlo_samples: 200
-  correlation_length_um: 500.0
-  random_seed: 42
-```
-
-### Key Parameters to Calibrate for Production Use
-
-| Parameter | Default | What to Replace With | Priority |
-|---|---|---|---|
-| `cmp.recess_nm_at_density` | copper_hybrid_bonding preset (Enquist 2019, Kim 2022) | Fab-specific Cu CMP measurements | **Critical** |
-| `yield_model.correlation_length_um` | 500 um (uncalibrated -- dominates yield by ~100x; use for relative comparison only) | Fab defect spatial correlation data | **Critical** |
-| `bonding.overlay_sigma_nm` | 20 nm | Actual overlay capability (from bonding tool) | **High** |
-| `anneal.anneal_temp_C` | 300 C | Actual anneal recipe temperature | **High** |
-| `bonding.particle_density_cm2` | 0.5 /cm^2 | Fab particle monitoring data | **Medium** |
-| `cmp.surface_roughness_nm` | 0.5 nm RMS | Fab AFM measurements | **Medium** |
-| `bonding.thickness_um` | 775 um | Actual wafer thickness (thinned wafers differ) | **Medium** |
-| `bonding.adhesion_energy_j_m2` | 0.5 J/m^2 | Measured surface energy (four-point bend test) | **Medium** |
+- **Method:** Uniform 40x40 die at 50% density. Tests low-defect vs.
+  high-defect configurations.
+- **Checks:**
+  - yield(low_defect) > yield(high_defect) (monotonicity).
+  - All yields in [0, 1].
+  - Different random seeds produce different results (non-determinism).
+- **Pass criteria:** All 3 sanity checks pass.
 
 ---
 
-## Appendix C: Frequently Asked Questions
+## 14. Dependencies
 
-**Q: Can I use this to predict yield in my fab?**
-A: Not directly, not yet. The default calibration now uses the copper_hybrid_bonding preset (Enquist 2019, Kim 2022), which is more appropriate than the previous aluminum default, but is still published academic data. You must replace the CMP calibration with your fab-specific measurements, calibrate the correlation_length_um against your yield data (this single uncalibrated parameter dominates yield by ~100x), and validate the contact mechanics against your bonding process. The platform provides the physics framework; you provide the calibration data.
+### Core Dependencies (required)
 
-**Q: How does this compare to what TSMC/Intel/Samsung use internally?**
-A: We do not know what these foundries use internally -- their yield prediction tools are proprietary. Bondability is likely simpler in some respects (2D not 3D, linear elastic, no multi-layer CMP) and more integrated in others (full physics chain from GDS to yield in one tool). The key difference is that Bondability is available for research evaluation.
+| Package | Version | Purpose |
+|---------|---------|---------|
+| numpy | >= 1.24 | Array operations, risk maps |
+| scipy | >= 1.10 | Sparse solvers, PCHIP, Gaussian filter, L-BFGS-B |
+| pandas | >= 2.0 | Data handling |
+| pyyaml | >= 6.0 | Configuration parsing |
+| pydantic | >= 2.0 | Configuration validation |
+| typer | >= 0.9 | CLI framework |
+| rich | >= 13.0 | CLI output formatting |
+| matplotlib | >= 3.7 | Plot generation |
+| shapely | >= 2.0 | Geometry operations |
+| gdstk | >= 0.9.50 | GDS/OASIS layout parsing |
+| scikit-learn | >= 1.3 | ML utilities |
 
-**Q: Is the spectral FFT solver novel?**
-A: The spectral approach to contact mechanics is well-established (Persson 2006). The novelty is applying it to hybrid bonding yield prediction within an automated pipeline, combined with Dugdale CZM adhesion and integrated with CMP, thermal, and yield models.
+### Optional: GPU Support (`[opt]`)
 
-**Q: Why is the thermal solver linear elastic?**
-A: Design-stage screening does not require the accuracy of incremental elasto-plastic analysis. Linear elastic stress is conservative (overestimates), which is the safe-side error for identifying risk. Adding plasticity would significantly increase complexity for modest accuracy improvement at screening resolution.
+| Package | Version | Purpose |
+|---------|---------|---------|
+| torch | >= 2.0 | GPU thermal solver (CG), CMP GPU path |
+| botorch | >= 0.9 | Bayesian optimization |
 
-**Q: Can this handle real GDS files?**
-A: Yes. The platform uses gdstk for GDS/OASIS parsing, which handles industry-standard layout files. You specify the pad layer and datatype, and the tool extracts the density map automatically.
+### Optional: Uncertainty Quantification (`[uq]`)
 
-**Q: What computing resources are needed?**
-A: A standard laptop with Python 3.10+ is sufficient. The CPU thermal solver uses scipy sparse, requiring ~1-10s for typical grids. The GPU thermal solver (optional, requires PyTorch) accelerates larger grids. No cloud infrastructure or HPC is required.
+| Package | Version | Purpose |
+|---------|---------|---------|
+| pyro-ppl | >= 1.9 | Probabilistic programming |
 
-**Q: What is the license?**
-A: CC BY-NC-ND 4.0. You may share the work with attribution for non-commercial purposes. No derivatives without permission. Contact Genesis Platform for commercial licensing inquiries.
+### Optional: REST API (`[api]`)
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| fastapi | >= 0.100 | REST API framework |
+| uvicorn | >= 0.20 | ASGI server |
+
+### Development (`[dev]`)
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| pytest | >= 7.4 | Testing |
+| pytest-cov | >= 4.1 | Coverage |
+| ruff | >= 0.3 | Linting + formatting |
+| mypy | >= 1.8 | Type checking |
+| pre-commit | >= 3.5 | Pre-commit hooks |
 
 ---
 
-*Genesis PROV 9: Bondability. Research-status computational platform for physics-based hybrid bonding yield prediction. Six-stage physics chain from GDS layout to manufacturing yield. Spectral FFT contact mechanics at O(N log N). Validated against four published benchmarks. 61 production source files, 17 test files (all passing). Honest about limitations. Ready for fab calibration and experimental validation.*
+## 15. Known Limitations
 
-*Version 2.0 | February 2026 | CC BY-NC-ND 4.0*
+This section documents honest limitations for buyer due diligence.
+These are engineering trade-offs, not bugs.
+
+### 15.1 CMP Calibration Defaults
+
+The default calibration now uses the `copper_hybrid_bonding` preset
+(Enquist 2019, Kim 2022) with recess ~2.5 nm at optimal density. The
+original Stine et al. 1998 aluminum curve is available as fallback.
+**For production use, a fab integration team should replace with
+fab-specific Cu CMP measurements.** The calibration module
+(`bondability.cmp.calibration`) supports loading custom fab data.
+
+### 15.2 Linear Elastic Thermal Solver (No Plasticity)
+
+The thermal FEA solver computes linear elastic stress. At 300C anneal
+with sharp Cu/SiO2 interfaces, peak von Mises stress can exceed Cu yield
+(~300 MPa at temperature). In reality, copper yields plastically and
+stress redistributes. Implementing proper incremental plasticity (load
+stepping, tangent stiffness, deviatoric radial return) was a scope
+decision. The solver reports honest elastic stress and is therefore
+CONSERVATIVE (overestimates stress at interfaces). For a more accurate
+stress field, use `smooth_interface=True` to eliminate the FD singularity.
+
+### 15.3 Contact Solver Under-Resolution at Tile Scale
+
+The Dugdale cohesive zone width (dc = 5 nm) is resolved at nanometer
+scale, but the tile grid is at 25 um. At tile resolution, the solver
+gives qualitatively correct contact/bridging behavior but quantitative
+gap values are approximate (2-5x error). Use `refine_factor >= 4` for
+production accuracy (subdivides each tile into 4x4 elements, 16x slower).
+
+### 15.4 Correlation Length is the Dominant Yield Knob
+
+The yield model's `correlation_length_um` parameter controls the number
+of independent failure clusters and dominates the final yield number.
+The default (500 um) is a reasonable starting point but is NOT calibrated
+to any specific fab's defect correlation data. A buyer must calibrate
+this against actual fab yield data. Changing this parameter from 200 um
+to 2000 um can swing yield by 20+ percentage points.
+
+### 15.5 No 3D CMP Model
+
+The CMP model is 2D (single-layer effective density). It does not model
+multi-layer CMP interactions, dishing propagation through stacked layers,
+or through-silicon via (TSV) topography effects on CMP.
+
+### 15.6 No Wafer-Level Warpage Model
+
+The bonding model uses a simple `warpage_um` parameter but does not
+compute wafer warpage from first principles (thermal gradient, film
+stress, CTE mismatch at wafer scale). A proper warpage model would
+require wafer-scale FEA with film stack integration.
+
+### 15.7 Heuristic Motif Detection
+
+Motif detection (isolated pads, TSV proximity, extreme gradients) uses
+threshold-based heuristics on the density map, not true pattern recognition.
+It does not detect specific layout structures (dummy fill, guard rings,
+seal rings).
+
+### 15.8 ML Surrogate Is Experimental
+
+The `bondability.ml` module (surrogate model and training pipeline) is
+present but experimental. It is NOT used in the production pipeline. The
+archived ML dataset (200 samples in archive/ml_datasets/) is small and
+is not a trained production model.
+
+### 15.9 REST API Job Store Is In-Memory
+
+The FastAPI job store is in-memory (Python dict). Jobs are lost on server
+restart. For production deployment, replace with a persistent job store
+(Redis, database).
+
+### 15.10 Single-Threaded Pipeline
+
+The pipeline runs stages sequentially on a single thread. No parallel
+execution of independent stages. The GPU thermal solver uses GPU
+parallelism internally but the overall pipeline is single-threaded.
+
+---
+
+## 16. Buyer Due Diligence Checklist
+
+### Code Quality
+
+- [ ] Run `make test` -- all 17 test files pass
+- [ ] Run `make test-all` -- all tests including slow benchmarks pass
+- [ ] Run `bondability benchmark` -- all 4 published-data benchmarks pass
+- [ ] Run `make lint` -- ruff reports clean
+- [ ] Run `make typecheck` -- mypy reports clean (with ignore_missing_imports)
+- [ ] Verify `pip install -e .` succeeds with Python >= 3.10
+- [ ] Verify `pip install -e ".[all]"` installs all optional dependencies
+
+### Physics Validation
+
+- [ ] CMP benchmark: hold-out predictions within Stine 1998 ranges
+- [ ] Contact benchmark: thick bridges, thin conforms (Turner 2002)
+- [ ] Thermal benchmark: FD/analytical ratio within [0.3, 3.0] (Suhir 1986)
+- [ ] Yield benchmark: monotonic, bounded, seed-sensitive
+- [ ] Run `bondability benchmark --verbose` and inspect per-check results
+- [ ] Verify CMP bathtub shape with `cmp_sanity_sweep()` -- minimum near d=0.5
+
+### End-to-End Pipeline
+
+- [ ] Run `bondability run --input examples/demo.npy --output test_results/`
+- [ ] Verify output directory contains: report.html, yield_summary.json,
+      rules_summary.json, risk_maps/, plots/, violations/
+- [ ] Open report.html -- verify executive summary, risk maps, yield
+      distribution, sensitivity analysis render correctly
+- [ ] Verify .lyrdb file opens in KLayout
+
+### REST API
+
+- [ ] Run `bondability serve` and visit http://localhost:8000/docs
+- [ ] POST /api/v1/simulate with a 10x10 density array
+- [ ] GET /api/v1/simulate/{job_id} -- verify completion
+- [ ] GET /api/v1/health -- verify solver availability
+- [ ] GET /api/v1/benchmarks -- verify all pass
+
+### Optimizer
+
+- [ ] Run `bondability optimize --input examples/demo.npy --output opt_test/`
+- [ ] Verify optimized_layout.npy and report.json are produced
+- [ ] Verify report.json contains yield, void_risk, delam_risk, gpu_peak_MPa
+
+### Configuration
+
+- [ ] Run `bondability config show` -- verify JSON output
+- [ ] Run `bondability config validate configs/process_example.yaml`
+- [ ] Modify configs/process_example.yaml and re-validate
+
+### Archive Provenance
+
+- [ ] Verify archive/runs/ contains 6 complete run directories
+- [ ] Verify archive/out_physics_final/ contains report.html + risk maps
+- [ ] Verify archive/scripts/ contains 45 historical proof scripts
+- [ ] Note: archive scripts are NOT production code and may have stale imports
+
+### Calibration Assessment
+
+- [ ] Review default CMP calibration (now `copper_hybrid_bonding` preset) --
+      consider replacing with fab-specific Cu CMP data for production
+- [ ] Review correlation_length_um (500 um default) -- understand this is
+      the single most impactful tunable and must be calibrated
+- [ ] Review anneal temperature (300C default) -- verify against target
+      process
+- [ ] Review overlay sigma (20 nm default) -- verify against target
+      process capability
+
+### IP and Scope
+
+- [ ] Production code is ~61 Python files, ~13,000 LOC in bondability/
+- [ ] 45 archive scripts are historical proofs, not production code
+- [ ] ML module is experimental and not in production pipeline
+- [ ] No external API keys, no cloud dependencies, no telemetry
+- [ ] MIT license
+
+---
+
+## References
+
+- Stine et al., "Rapid Characterization and Modeling of Pattern-Dependent
+  Variation in CMP", IEEE TSM, 1998
+- Turner & Spearing, "Modeling of Direct Wafer Bonding", J. Appl. Phys., 2002
+- Suhir, "Stresses in Bi-Metal Thermostats", J. Appl. Mech., 1986
+- Murphy, "Yield, Reliability, and Defect Density", Proc. IEEE, 1964
+- Stapper, "Modeling of Defects in ICs", IBM J. Res. Dev., 1983
+- Cunningham, "The Use and Evaluation of Yield Models", IEEE TSM, 1990
+- Persson, "Contact Mechanics for Randomly Rough Surfaces", Surf. Sci. Rep., 2006
+- Hutchinson & Suo, "Mixed Mode Cracking in Layered Materials", Adv. Appl. Mech., 1992
+- Maugis, "Adhesion of Spheres: The JKR-DMT Transition", J. Colloid
+  Interface Sci., 1992
+- Ouma et al., "Characterization and Modeling of Oxide CMP", IEEE TSM, 2002
+- Timoshenko & Goodier, "Theory of Elasticity", 3rd Ed., 1970
+- Greenwood & Williamson, "Contact of Nominally Flat Surfaces", Proc. R.
+  Soc. London A, 1966

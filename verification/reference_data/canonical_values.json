@@ -15,7 +15,7 @@
   "contact_solver_complexity": "O(N log N) per L-BFGS-B iteration",
   "contact_dugdale_dc_nm": 5.0,
   "contact_adhesion_energy_default_j_m2": 0.5,
-  "contact_modulus_default_gpa": 130.0,
+  "contact_modulus_default_gpa": 170.0,
   "contact_wafer_thickness_default_um": 775.0,
   "yield_model": "Murphy/Stapper negative binomial",
   "yield_murphy_formula": "Y_k = 1/(1+D_k) per cluster",
