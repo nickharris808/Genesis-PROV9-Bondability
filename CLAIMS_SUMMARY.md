@@ -130,4 +130,64 @@
 
 ---
 
+## Appendix: correlation_length_um Calibration Guide
+
+### What is correlation_length_um?
+
+`correlation_length_um` (default: 500 um) controls the spatial autocorrelation of bonding defects in the Monte Carlo yield model. It determines how many *independent failure clusters* exist on a die:
+
+    n_clusters = (die_H * die_W) / (correlation_length / tile_um)^2
+
+For example, on a 64x64-tile die with 25 um tiles and correlation_length = 500 um (= 20 tiles), n_clusters ~ 10. Each cluster fails or succeeds semi-independently; total yield is the product of per-cluster survival probabilities.
+
+### Why it dominates yield by ~100x
+
+This single parameter swings yield predictions by roughly 100x more than all other sampled parameters (overlay sigma, particle density, roughness) combined:
+
+- correlation_length = 100 um --> many independent clusters --> yield ~ 40%
+- correlation_length = 500 um (default) --> moderate clustering --> yield ~ 85%
+- correlation_length = 1000 um --> few clusters --> yield ~ 99%
+
+The physics: shorter correlation lengths mean defects are spatially uncorrelated, so each small region of the die independently rolls the dice on bonding success. Longer correlation lengths mean defects clump together, and most of the die bonds successfully while a few localized regions contain all the failures -- overall yield is much higher because one bad cluster does not kill the whole die.
+
+**Yield predictions are only as reliable as this calibration.** All other model improvements (CMP fidelity, contact solver accuracy, thermal stress) are secondary to getting this parameter right.
+
+### How to calibrate (fab partner workflow)
+
+In order of decreasing reliability:
+
+1. **BEST -- Wafer inspection autocorrelation.** Obtain a bonding defect map from KLA/Onto SAM (Scanning Acoustic Microscopy) or IR transmission imaging of bonded wafer pairs. Compute the 2D spatial autocorrelation of the binary defect map. The distance at which the autocorrelation drops to 1/e is the correlation_length. Typical result for Cu-Cu hybrid bonding: 200-800 um.
+
+2. **GOOD -- Layout autocorrelation proxy.** Use `estimate_correlation_length()` on a real density map extracted from production GDS. This uses the layout density autocorrelation as a proxy for defect correlation. Less accurate than direct defect measurement but requires no fab data.
+
+3. **FAIR -- Published literature values.** Cunningham 1990 reports 200-500 um for generic IC defects. Turner & Spearing 2002 reports 100-300 um for direct bonding defects. Use these as starting points and bracket with sensitivity analysis.
+
+4. **WORST -- Use the default (500 um).** This is an educated guess within the plausible range. Always run sensitivity analysis (`sensitivity_analysis: true` in config) to understand how much yield predictions change across the 100-1000 um range.
+
+### Sensitivity range
+
+| correlation_length_um | Approximate yield (typical die) | Confidence |
+|-----------------------|--------------------------------|------------|
+| 100 um | ~30-50% | Too pessimistic for most processes |
+| 200 um | ~50-70% | Conservative (early process) |
+| 500 um (default) | ~80-90% | Moderate (mature process) |
+| 1000 um | ~95-99% | Optimistic (best-in-class) |
+| 2000 um | ~99%+ | Entire die acts as one cluster |
+
+The realistic range is 100-2000 um. Values below 100 um produce unrealistically many independent clusters; values above 2000 um make the entire die a single cluster (too optimistic).
+
+### Configuration
+
+In `process_example.yaml` or programmatically:
+
+```yaml
+yield_model:
+  correlation_length_um: 500.0   # MUST calibrate to your process
+  sensitivity_analysis: true     # Always run sensitivity sweeps
+```
+
+See also: `bondability/config.py` (YieldModelConfig), `HONEST_DISCLOSURES.md` #7.
+
+---
+
 *All claims are research-status. No provisional patent has been filed. Validation is against published academic data, not proprietary fab data.*
